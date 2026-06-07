@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FastiRide</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: radial-gradient(ellipse at 30% 20%, #1a0533 0%, #0a0a14 55%, #00060f 100%); }
+
+    .role-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 0 40px rgba(168, 85, 247, 0.18);
+      border-color: rgba(168, 85, 247, 0.5);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      transition: all 0.2s;
+    }
+    .btn-primary:hover {
+      box-shadow: 0 0 28px rgba(168, 85, 247, 0.5);
+      transform: translateY(-1px);
+    }
+    .btn-primary:disabled { opacity: 0.6; transform: none; box-shadow: none; cursor: not-allowed; }
+
+    .btn-instagram {
+      background: linear-gradient(135deg, #833ab4, #c13584, #e1306c, #fd1d1d);
+      transition: all 0.2s;
+    }
+    .btn-instagram:hover { box-shadow: 0 0 28px rgba(225, 48, 108, 0.45); transform: translateY(-1px); }
+    .btn-instagram:disabled { opacity: 0.6; transform: none; cursor: not-allowed; }
+
+    input[type="text"], input[type="email"], input[type="date"], select { background: #09090f; }
+    input:focus, select:focus {
+      box-shadow: 0 0 0 1px #a855f7, 0 0 14px rgba(168, 85, 247, 0.15);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-start justify-center px-4 py-12">
+
+  <!-- ambient blobs -->
+  <div class="fixed top-0 left-1/4 w-96 h-96 bg-purple-900/20 rounded-full blur-3xl pointer-events-none"></div>
+  <div class="fixed bottom-10 right-1/4 w-80 h-80 bg-violet-900/10 rounded-full blur-3xl pointer-events-none"></div>
+
+  <div class="relative w-full max-w-2xl">
+
+
+    <!-- ════════════════════════════════════════════════════════════
+         STEP 1 — LANDING
+    ════════════════════════════════════════════════════════════ -->
+    <div data-step="landing">
+
+      <div class="text-center mb-12">
+        <div class="inline-flex items-center gap-2 mb-3">
+          <span class="text-4xl">⚡</span>
+          <span class="text-5xl font-extrabold tracking-tight bg-gradient-to-r from-purple-400 via-violet-300 to-cyan-400 bg-clip-text text-transparent">
+            FastiRide
+          </span>
+        </div>
+        <p class="text-zinc-400 text-base">Ride Sharing Platform</p>
+        <p class="text-zinc-600 text-sm mt-1">Who are you joining us as today?</p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+        <button onclick="show('user-login')"
+          class="role-card bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-8 text-left cursor-pointer transition-all duration-200 group">
+          <div class="text-4xl mb-4">🎪</div>
+          <h2 class="text-white font-bold text-xl mb-2">I am a User</h2>
+          <p class="text-zinc-500 text-sm leading-relaxed">Upload your festival ticket and find or create shared rides to the event.</p>
+          <div class="mt-6 inline-flex items-center gap-1 text-purple-400 text-sm font-medium">
+            Get started <span class="group-hover:translate-x-1 transition-transform inline-block">&rarr;</span>
+          </div>
+        </button>
+
+        <button onclick="show('organizer')"
+          class="role-card bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-8 text-left cursor-pointer transition-all duration-200 group">
+          <div class="text-4xl mb-4">🎛️</div>
+          <h2 class="text-white font-bold text-xl mb-2">I am an Organizer</h2>
+          <p class="text-zinc-500 text-sm leading-relaxed">Register your event, define ticket validation rules, and manage the ride board.</p>
+          <div class="mt-6 inline-flex items-center gap-1 text-purple-400 text-sm font-medium">
+            Set up event <span class="group-hover:translate-x-1 transition-transform inline-block">&rarr;</span>
+          </div>
+        </button>
+
+      </div>
+    </div>
+
+
+    <!-- ════════════════════════════════════════════════════════════
+         STEP 2 — ORGANIZER REGISTRATION
+    ════════════════════════════════════════════════════════════ -->
+    <div data-step="organizer" class="hidden">
+
+      <button onclick="show('landing')" class="flex items-center gap-1.5 text-zinc-500 hover:text-purple-400 text-sm mb-8 transition-colors">
+        &larr; Back
+      </button>
+
+      <div class="mb-8">
+        <h1 class="text-white font-bold text-2xl">Create your Event</h1>
+        <p class="text-zinc-500 text-sm mt-1">Fill in your details and define the festival configuration.</p>
+      </div>
+
+      <form onsubmit="submitOrganizer(event)" class="space-y-5">
+
+        <!-- organizer details -->
+        <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-6">
+          <h3 class="text-zinc-400 text-xs font-semibold uppercase tracking-widest mb-4">Organizer Details</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs text-zinc-500 mb-1.5">Full Name</label>
+              <input type="text" placeholder="Alex Johnson" required
+                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-500 mb-1.5">Organization</label>
+              <input type="text" placeholder="Ozora Productions" required
+                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-xs text-zinc-500 mb-1.5">Email</label>
+              <input type="email" placeholder="organizer@ozora.hu" required
+                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+            </div>
+          </div>
+        </div>
+
+        <!-- festival metadata -->
+        <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-6">
+          <h3 class="text-zinc-400 text-xs font-semibold uppercase tracking-widest mb-4">Festival Metadata</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs text-zinc-500 mb-1.5">Event Name</label>
+              <input id="org-event-name" type="text" placeholder="Ozora Festival 2025" required
+                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-500 mb-1.5">Event Date</label>
+              <input type="date" required
+                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors" />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-500 mb-1.5">Location</label>
+              <input type="text" placeholder="Ozora, Hungary" required
+                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+            </div>
+            <div>
+              <label class="block text-xs text-zinc-500 mb-1.5">Ticket Prefix</label>
+              <input id="org-prefix" type="text" placeholder="OZORA-" required
+                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm font-mono placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+            </div>
+          </div>
+        </div>
+
+        <!-- API permissions -->
+        <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-6">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="text-zinc-400 text-xs font-semibold uppercase tracking-widest">API Permissions</h3>
+            <span class="text-xs bg-purple-950 text-purple-400 border border-purple-800/60 rounded-full px-2 py-0.5">Integration</span>
+          </div>
+          <p class="text-zinc-600 text-xs mb-4">Grant FastiRide API access to validate tickets on behalf of your event.</p>
+
+          <div class="space-y-3">
+            <label class="flex items-start gap-3 border border-zinc-700/50 rounded-xl p-3.5 cursor-pointer hover:border-purple-700/40 transition-colors">
+              <input type="checkbox" checked class="mt-0.5 w-4 h-4 accent-purple-500 shrink-0" />
+              <div>
+                <p class="text-white text-sm font-medium font-mono">tickets:validate</p>
+                <p class="text-zinc-500 text-xs mt-0.5">Allow the platform to verify ticket codes against your event rules</p>
+              </div>
+            </label>
+            <label class="flex items-start gap-3 border border-zinc-700/50 rounded-xl p-3.5 cursor-pointer hover:border-purple-700/40 transition-colors">
+              <input type="checkbox" checked class="mt-0.5 w-4 h-4 accent-purple-500 shrink-0" />
+              <div>
+                <p class="text-white text-sm font-medium font-mono">rides:read</p>
+                <p class="text-zinc-500 text-xs mt-0.5">View all ride activity associated with your event</p>
+              </div>
+            </label>
+            <label class="flex items-start gap-3 border border-zinc-700/50 rounded-xl p-3.5 cursor-pointer hover:border-purple-700/40 transition-colors">
+              <input type="checkbox" class="mt-0.5 w-4 h-4 accent-purple-500 shrink-0" />
+              <div>
+                <p class="text-white text-sm font-medium font-mono">rides:moderate</p>
+                <p class="text-zinc-500 text-xs mt-0.5">Approve or reject ride requests on behalf of drivers</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary w-full text-white font-semibold py-3.5 rounded-xl text-sm tracking-wide">
+          Create Event &amp; Generate API Key &rarr;
+        </button>
+
+      </form>
+    </div>
+
+
+    <!-- ════════════════════════════════════════════════════════════
+         STEP 3 — ORGANIZER DASHBOARD
+    ════════════════════════════════════════════════════════════ -->
+    <div data-step="org-dashboard" class="hidden">
+
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-16 h-16 bg-emerald-950 border border-emerald-700/60 rounded-full mb-4 text-3xl">✓</div>
+        <h1 class="text-white font-bold text-2xl">Event Created!</h1>
+        <p class="text-zinc-500 text-sm mt-1">Your festival is live on FastiRide.</p>
+      </div>
+
+      <div class="space-y-4">
+
+        <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-6">
+          <h3 class="text-zinc-400 text-xs font-semibold uppercase tracking-widest mb-4">Event Summary</h3>
+          <div class="grid grid-cols-2 gap-y-4 gap-x-6">
+            <div>
+              <p class="text-zinc-600 text-xs">Event Name</p>
+              <p id="dash-event-name" class="text-white font-medium text-sm mt-0.5">—</p>
+            </div>
+            <div>
+              <p class="text-zinc-600 text-xs">Ticket Prefix</p>
+              <p id="dash-prefix" class="text-purple-400 font-mono text-sm mt-0.5">—</p>
+            </div>
+            <div class="col-span-2">
+              <!-- label + tooltip -->
+              <div class="flex items-center gap-1.5 mb-1.5">
+                <p class="text-zinc-600 text-xs">Event Connection Code</p>
+                <div class="relative group">
+                  <span class="w-4 h-4 rounded-full bg-zinc-700 text-zinc-400 text-xs font-bold flex items-center justify-center cursor-default select-none">?</span>
+                  <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-zinc-800 border border-zinc-600 rounded-xl px-3 py-2.5 text-xs text-zinc-300 leading-relaxed opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-10 shadow-xl">
+                    This code allows FastiRide to verify tickets for your event. Keep it safe — treat it like a password.
+                    <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-zinc-600"></div>
+                  </div>
+                </div>
+              </div>
+              <!-- code field: hidden by default -->
+              <div class="flex items-center gap-2 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2.5">
+                <code id="dash-api-key" data-value="" class="text-emerald-400 font-mono text-xs flex-1 truncate tracking-widest">••••••••••••••••••••</code>
+                <button onclick="toggleKey(this)" class="text-zinc-500 hover:text-zinc-200 text-xs transition-colors shrink-0 border-r border-zinc-700 pr-2 mr-0">Show</button>
+                <button id="copy-btn" onclick="copyKey()" class="text-zinc-500 hover:text-zinc-200 text-xs transition-colors shrink-0">Copy</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div class="bg-zinc-900/60 border border-zinc-700/40 rounded-xl p-4 text-center">
+            <p class="text-2xl font-bold text-purple-400">0</p>
+            <p class="text-zinc-600 text-xs mt-1">Rides</p>
+          </div>
+          <div class="bg-zinc-900/60 border border-zinc-700/40 rounded-xl p-4 text-center">
+            <p class="text-2xl font-bold text-cyan-400">0</p>
+            <p class="text-zinc-600 text-xs mt-1">Attendees</p>
+          </div>
+          <div class="bg-zinc-900/60 border border-zinc-700/40 rounded-xl p-4 text-center">
+            <p class="text-2xl font-bold text-emerald-400">&#10003;</p>
+            <p class="text-zinc-600 text-xs mt-1">Live</p>
+          </div>
+        </div>
+
+        <a href="/ride-board"
+          class="btn-primary block w-full text-white font-semibold py-3.5 rounded-xl text-sm tracking-wide text-center">
+          Open Ride Board &rarr;
+        </a>
+
+      </div>
+    </div>
+
+
+    <!-- ════════════════════════════════════════════════════════════
+         STEP 4 — USER: INSTAGRAM LOGIN
+    ════════════════════════════════════════════════════════════ -->
+    <div data-step="user-login" class="hidden">
+
+      <button onclick="show('landing')" class="flex items-center gap-1.5 text-zinc-500 hover:text-purple-400 text-sm mb-8 transition-colors">
+        &larr; Back
+      </button>
+
+      <!-- step progress -->
+      <div class="flex items-center gap-2 mb-8">
+        <div class="flex items-center gap-2">
+          <span class="w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+          <span class="text-white text-xs font-medium">Connect Account</span>
+        </div>
+        <div class="flex-1 h-px bg-zinc-700"></div>
+        <div class="flex items-center gap-2">
+          <span class="w-6 h-6 rounded-full bg-zinc-700 text-zinc-500 text-xs font-bold flex items-center justify-center">2</span>
+          <span class="text-zinc-500 text-xs">Upload Ticket</span>
+        </div>
+      </div>
+
+      <div class="mb-8">
+        <h1 class="text-white font-bold text-2xl">Connect your account</h1>
+        <p class="text-zinc-500 text-sm mt-1">Step 1 of 2 &mdash; We use Instagram to identify you on the ride board so other riders know who you are.</p>
+      </div>
+
+      <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-8">
+        <button id="ig-btn" onclick="mockInstagramLogin(this)"
+          class="btn-instagram w-full text-white font-semibold py-3.5 rounded-xl text-sm tracking-wide flex items-center justify-center gap-2.5">
+          <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+          </svg>
+          Continue with Instagram
+        </button>
+        <p class="text-zinc-600 text-xs text-center mt-4">Simulated OAuth &mdash; no real credentials required.</p>
+      </div>
+
+    </div>
+
+
+    <!-- ════════════════════════════════════════════════════════════
+         STEP 5 — USER: UPLOAD TICKET + SELECT PARTY
+    ════════════════════════════════════════════════════════════ -->
+    <div data-step="user-upload" class="hidden">
+
+      <button onclick="show('user-login')" class="flex items-center gap-1.5 text-zinc-500 hover:text-purple-400 text-sm mb-8 transition-colors">
+        &larr; Back
+      </button>
+
+      <!-- step progress -->
+      <div class="flex items-center gap-2 mb-8">
+        <div class="flex items-center gap-2">
+          <span class="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">&#10003;</span>
+          <span class="text-zinc-400 text-xs">Connect Account</span>
+        </div>
+        <div class="flex-1 h-px bg-purple-700"></div>
+        <div class="flex items-center gap-2">
+          <span class="w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+          <span class="text-white text-xs font-medium">Upload Ticket</span>
+        </div>
+      </div>
+
+      <div class="mb-6">
+        <h1 class="text-white font-bold text-2xl">Upload your ticket</h1>
+        <p class="text-zinc-500 text-sm mt-1">Step 2 of 2 &mdash; Upload your festival PDF and select the event to validate access.</p>
+      </div>
+
+      <!-- mock profile pill -->
+      <div class="flex items-center gap-3 bg-zinc-900/60 border border-zinc-700/40 rounded-2xl px-5 py-4 mb-6">
+        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm shrink-0">JD</div>
+        <div>
+          <p class="text-white text-sm font-medium">@john.doe.festival</p>
+          <p class="text-zinc-500 text-xs flex items-center gap-1.5 mt-0.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+            Connected via Instagram
+          </p>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+
+        <!-- ticket upload -->
+        <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-6">
+          <h3 class="text-zinc-400 text-xs font-semibold uppercase tracking-widest mb-4">Upload Ticket</h3>
+          <label class="flex flex-col items-center justify-center border-2 border-dashed border-zinc-700 rounded-xl p-8 cursor-pointer hover:border-purple-600/50 transition-colors group">
+            <span class="text-3xl mb-3 group-hover:scale-110 transition-transform">📄</span>
+            <p class="text-zinc-400 text-sm font-medium">Click to upload your ticket PDF</p>
+            <p class="text-zinc-600 text-xs mt-1">PDF only &middot; max 10 MB</p>
+            <input id="ticket-file" type="file" accept=".pdf" class="hidden" onchange="onFileSelect(this)" />
+          </label>
+          <div id="file-preview" class="hidden mt-3 flex items-center gap-3 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3">
+            <span class="text-red-400 shrink-0">📕</span>
+            <span id="file-name" class="text-zinc-300 text-sm flex-1 truncate"></span>
+            <span class="text-emerald-400 text-xs font-medium shrink-0">Ready</span>
+          </div>
+        </div>
+
+        <!-- party select -->
+        <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-6">
+          <h3 class="text-zinc-400 text-xs font-semibold uppercase tracking-widest mb-4">Select Party</h3>
+          <select id="party-select"
+            class="w-full border border-zinc-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors appearance-none cursor-pointer">
+            <option value="" class="bg-zinc-900">Choose an event&hellip;</option>
+            <option value="ozora" class="bg-zinc-900">⚡ Ozora Festival 2025 &mdash; Jul 18–22</option>
+            <option value="subsonic" class="bg-zinc-900">🎵 Subsonic 2025 &mdash; Aug 9–12</option>
+            <option value="boom" class="bg-zinc-900">🌍 Boom Festival 2025 &mdash; Aug 14–21</option>
+          </select>
+        </div>
+
+        <button id="validate-btn" onclick="validateTicket()"
+          class="btn-primary w-full text-white font-semibold py-3.5 rounded-xl text-sm tracking-wide">
+          Validate &amp; Enter Ride Board &rarr;
+        </button>
+
+        <div id="validate-error" class="hidden flex items-start gap-3 bg-red-950/50 border border-red-800/50 rounded-xl px-4 py-3">
+          <span class="text-red-400 shrink-0 mt-0.5">&#9888;</span>
+          <p class="text-red-300 text-sm">Please upload a ticket PDF and select a party before continuing.</p>
+        </div>
+
+      </div>
+    </div>
+
+
+  </div><!-- /max-w-2xl -->
+
+  <script>
+    // ── Step navigation ───────────────────────────────────────────
+    function show(stepName) {
+      document.querySelectorAll('[data-step]').forEach(el => el.classList.add('hidden'));
+      document.querySelector(`[data-step="${stepName}"]`).classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ── Organizer form submit ─────────────────────────────────────
+    function submitOrganizer(e) {
+      e.preventDefault();
+      const name   = document.getElementById('org-event-name').value || 'My Event';
+      const prefix = document.getElementById('org-prefix').value    || 'EVENT-';
+      const apiKey = 'frd_live_' + Math.random().toString(36).slice(2, 18).toUpperCase();
+
+      document.getElementById('dash-event-name').textContent = name;
+      document.getElementById('dash-prefix').textContent     = prefix;
+
+      // Store the real key in data-value; display dots by default
+      const keyEl = document.getElementById('dash-api-key');
+      keyEl.dataset.value  = apiKey;
+      keyEl.textContent    = '••••••••••••••••••••';
+      keyEl.dataset.visible = 'false';
+
+      show('org-dashboard');
+    }
+
+    function toggleKey(btn) {
+      const keyEl  = document.getElementById('dash-api-key');
+      const isHidden = keyEl.dataset.visible === 'false';
+      keyEl.textContent    = isHidden ? keyEl.dataset.value : '••••••••••••••••••••';
+      keyEl.dataset.visible = isHidden ? 'true' : 'false';
+      btn.textContent      = isHidden ? 'Hide' : 'Show';
+    }
+
+    function copyKey() {
+      const keyEl = document.getElementById('dash-api-key');
+      navigator.clipboard.writeText(keyEl.dataset.value);
+      const btn = document.getElementById('copy-btn');
+      btn.textContent = 'Copied!';
+      btn.classList.add('text-emerald-400');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('text-emerald-400'); }, 2000);
+    }
+
+    // ── Instagram mock OAuth ──────────────────────────────────────
+    function mockInstagramLogin(btn) {
+      btn.disabled     = true;
+      btn.textContent  = 'Connecting to Instagram…';
+      setTimeout(() => show('user-upload'), 1300);
+    }
+
+    // ── File upload preview ───────────────────────────────────────
+    function onFileSelect(input) {
+      if (!input.files.length) return;
+      document.getElementById('file-name').textContent = input.files[0].name;
+      document.getElementById('file-preview').classList.remove('hidden');
+    }
+
+    // ── Ticket validation (mock) ──────────────────────────────────
+    function validateTicket() {
+      const hasFile  = document.getElementById('ticket-file').files.length > 0;
+      const hasParty = document.getElementById('party-select').value !== '';
+      const errEl    = document.getElementById('validate-error');
+      const btn      = document.getElementById('validate-btn');
+
+      if (!hasFile || !hasParty) {
+        errEl.classList.remove('hidden');
+        return;
+      }
+      errEl.classList.add('hidden');
+      btn.disabled    = true;
+      btn.textContent = 'Validating ticket…';
+      setTimeout(() => { window.location.href = '/ride-board'; }, 1400);
+    }
+  </script>
+
+</body>
+</html>

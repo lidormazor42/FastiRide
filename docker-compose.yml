@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+
+  backend:
+    build: ./backend
+    container_name: fastiride-backend
+    environment:
+      - PORT=8000
+    networks:
+      - fastiride-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    # No "ports:" here — backend is intentionally not reachable from the host.
+    # Only the frontend (Nginx) can reach it, via the internal Docker network.
+
+  frontend:
+    build: ./frontend
+    container_name: fastiride-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - fastiride-net
+
+networks:
+  fastiride-net:
+    driver: bridge

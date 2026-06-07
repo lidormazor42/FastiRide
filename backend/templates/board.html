@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FastiRide – Ride Board</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: radial-gradient(ellipse at 30% 20%, #1a0533 0%, #0a0a14 55%, #00060f 100%); }
+
+    .ride-card { transition: all 0.2s; }
+    .ride-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(168, 85, 247, 0.12);
+      border-color: rgba(168, 85, 247, 0.3);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      transition: all 0.2s;
+    }
+    .btn-primary:hover { box-shadow: 0 0 22px rgba(168, 85, 247, 0.45); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    input[type="text"], input[type="date"], input[type="time"], select { background: #09090f; }
+    input:focus, select:focus {
+      box-shadow: 0 0 0 1px #a855f7, 0 0 12px rgba(168, 85, 247, 0.12);
+    }
+  </style>
+</head>
+<body class="min-h-screen text-zinc-100">
+
+  <!-- ambient blobs -->
+  <div class="fixed top-0 left-0 w-96 h-96 bg-purple-900/15 rounded-full blur-3xl pointer-events-none"></div>
+  <div class="fixed bottom-0 right-0 w-80 h-80 bg-violet-900/10 rounded-full blur-3xl pointer-events-none"></div>
+
+
+  <!-- ════════════════════════════════════════════════════════════
+       NAV
+  ════════════════════════════════════════════════════════════ -->
+  <nav class="sticky top-0 z-10 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800/60">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+
+      <div class="flex items-center gap-2">
+        <span class="text-xl">⚡</span>
+        <span class="text-lg font-extrabold tracking-tight bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">FastiRide</span>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <span class="hidden sm:flex items-center gap-1.5 bg-zinc-900 border border-zinc-700/60 rounded-full px-3 py-1.5 text-xs">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-zinc-400">Ride Sharing Platform</span>
+        </span>
+        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold shrink-0">JD</div>
+      </div>
+
+    </div>
+  </nav>
+
+
+  <!-- ════════════════════════════════════════════════════════════
+       PAGE HEADER
+  ════════════════════════════════════════════════════════════ -->
+  <div class="max-w-6xl mx-auto px-4 pt-8 pb-6">
+    <h1 class="text-2xl font-bold text-white">Ride Board</h1>
+    <p class="text-zinc-500 text-sm mt-1">Find a ride or offer one to fellow festival goers.</p>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════════════════
+       MAIN LAYOUT
+  ════════════════════════════════════════════════════════════ -->
+  <div class="max-w-6xl mx-auto px-4 pb-16">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+
+      <!-- ── LEFT: Create Ride ──────────────────────────────────── -->
+      <div class="lg:col-span-1">
+        <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-6 lg:sticky lg:top-24">
+
+          <h2 class="text-white font-semibold mb-0.5">Create a Ride</h2>
+          <p class="text-zinc-500 text-xs mb-5">Offer seats and let others join your ride to the festival.</p>
+
+          <form id="create-ride-form" onsubmit="createRide(event)" class="space-y-4">
+
+            <div>
+              <label class="block text-xs text-zinc-500 mb-1.5">Departure City</label>
+              <input id="r-city" type="text" placeholder="e.g. Budapest" required
+                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+            </div>
+
+            <div>
+              <label class="block text-xs text-zinc-500 mb-1.5">Pickup Point</label>
+              <input id="r-point" type="text" placeholder="e.g. Keleti Station, Gate B" required
+                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-zinc-500 mb-1.5">Date</label>
+                <input id="r-date" type="date" required
+                  class="w-full border border-zinc-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors" />
+              </div>
+              <div>
+                <label class="block text-xs text-zinc-500 mb-1.5">Time</label>
+                <input id="r-time" type="time" required
+                  class="w-full border border-zinc-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs text-zinc-500 mb-1.5">Empty Seats</label>
+              <select id="r-seats"
+                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors appearance-none cursor-pointer">
+                <option value="1">1 seat</option>
+                <option value="2" selected>2 seats</option>
+                <option value="3">3 seats</option>
+                <option value="4">4 seats</option>
+                <option value="5">5 seats</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn-primary w-full text-white font-semibold py-3 rounded-xl text-sm tracking-wide">
+              Post Ride &rarr;
+            </button>
+
+          </form>
+        </div>
+      </div>
+
+
+      <!-- ── RIGHT: Available Rides ─────────────────────────────── -->
+      <div class="lg:col-span-2 space-y-4">
+
+        <div class="flex items-center justify-between">
+          <h2 class="text-white font-semibold">Available Rides</h2>
+          <span id="ride-count" class="text-xs text-zinc-500">4 rides</span>
+        </div>
+
+        <!-- My requests summary (hidden until a join is made) -->
+        <div id="requests-banner" class="hidden flex items-center gap-3 bg-yellow-950/40 border border-yellow-800/40 rounded-xl px-4 py-3">
+          <span class="text-yellow-400 text-sm">⏳</span>
+          <p class="text-yellow-300 text-xs">You have pending join requests. Drivers will approve or reject them shortly.</p>
+        </div>
+
+        <div id="rides-list" class="space-y-3">
+
+          <!-- Ride 1: Budapest → Ozora -->
+          <div class="ride-card bg-zinc-900/70 border border-zinc-700/50 rounded-2xl p-5">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                  <h3 class="text-white font-semibold text-sm">Budapest &rarr; Ozora</h3>
+                  <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Open
+                  </span>
+                </div>
+                <p class="text-zinc-500 text-xs">Fri 18 Jul &middot; 08:00</p>
+                <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-400">
+                  <span>&#128100; Anna K.</span>
+                  <span>&#128722; 3 seats</span>
+                  <span>&#128205; Keleti Station, Gate B</span>
+                </div>
+              </div>
+              <button onclick="joinRide(this)"
+                class="shrink-0 text-xs font-semibold px-4 py-2 rounded-xl bg-purple-950 border border-purple-700/60 text-purple-300 hover:bg-purple-900 transition-colors">
+                Request to Join
+              </button>
+            </div>
+          </div>
+
+          <!-- Ride 2: Vienna → Ozora -->
+          <div class="ride-card bg-zinc-900/70 border border-zinc-700/50 rounded-2xl p-5">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                  <h3 class="text-white font-semibold text-sm">Vienna &rarr; Ozora</h3>
+                  <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Open
+                  </span>
+                </div>
+                <p class="text-zinc-500 text-xs">Fri 18 Jul &middot; 06:30</p>
+                <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-400">
+                  <span>&#128100; Marco R.</span>
+                  <span>&#128722; 1 seat</span>
+                  <span>&#128205; Westbahnhof, main exit</span>
+                </div>
+              </div>
+              <button onclick="joinRide(this)"
+                class="shrink-0 text-xs font-semibold px-4 py-2 rounded-xl bg-purple-950 border border-purple-700/60 text-purple-300 hover:bg-purple-900 transition-colors">
+                Request to Join
+              </button>
+            </div>
+          </div>
+
+          <!-- Ride 3: Prague → Ozora (FULL) -->
+          <div class="ride-card bg-zinc-900/50 border border-zinc-700/30 rounded-2xl p-5 opacity-55">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                  <h3 class="text-zinc-400 font-semibold text-sm">Prague &rarr; Ozora</h3>
+                  <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-950 text-red-400 border border-red-800/60">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>Full
+                  </span>
+                </div>
+                <p class="text-zinc-600 text-xs">Thu 17 Jul &middot; 14:00</p>
+                <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-600">
+                  <span>&#128100; Jana S.</span>
+                  <span>&#128722; 0 seats</span>
+                  <span>&#128205; Main Square</span>
+                </div>
+              </div>
+              <button disabled
+                class="shrink-0 text-xs font-semibold px-4 py-2 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-600 cursor-not-allowed">
+                Full
+              </button>
+            </div>
+          </div>
+
+          <!-- Ride 4: Ozora → Budapest -->
+          <div class="ride-card bg-zinc-900/70 border border-zinc-700/50 rounded-2xl p-5">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                  <h3 class="text-white font-semibold text-sm">Ozora &rarr; Budapest</h3>
+                  <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Open
+                  </span>
+                </div>
+                <p class="text-zinc-500 text-xs">Mon 22 Jul &middot; 16:00</p>
+                <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-400">
+                  <span>&#128100; David L.</span>
+                  <span>&#128722; 2 seats</span>
+                  <span>&#128205; Festival main gate</span>
+                </div>
+              </div>
+              <button onclick="joinRide(this)"
+                class="shrink-0 text-xs font-semibold px-4 py-2 rounded-xl bg-purple-950 border border-purple-700/60 text-purple-300 hover:bg-purple-900 transition-colors">
+                Request to Join
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /rides-list -->
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ── Footer ─────────────────────────────────────────────────── -->
+  <div class="text-center py-8">
+    <a href="/" class="text-zinc-600 hover:text-purple-400 text-sm transition-colors">&larr; Back to home</a>
+  </div>
+
+
+  <script>
+    // ── Join Ride ─────────────────────────────────────────────────
+    function joinRide(btn) {
+      btn.disabled  = true;
+      btn.innerHTML = '&#9203; Pending';
+      btn.className = 'shrink-0 text-xs font-semibold px-4 py-2 rounded-xl bg-yellow-950 border border-yellow-700/50 text-yellow-400 cursor-default';
+      document.getElementById('requests-banner').classList.remove('hidden');
+    }
+
+    // ── Create Ride ───────────────────────────────────────────────
+    function createRide(e) {
+      e.preventDefault();
+
+      const city  = document.getElementById('r-city').value;
+      const point = document.getElementById('r-point').value;
+      const date  = document.getElementById('r-date').value;
+      const time  = document.getElementById('r-time').value;
+      const seats = document.getElementById('r-seats').value;
+
+      const dateLabel = date
+        ? new Date(date + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' })
+        : '';
+
+      const card = document.createElement('div');
+      card.className = 'ride-card bg-zinc-900/70 border border-purple-700/40 rounded-2xl p-5 ring-1 ring-purple-700/20';
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap mb-1">
+              <h3 class="text-white font-semibold text-sm">${escHtml(city)} &rarr; Ozora</h3>
+              <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Open
+              </span>
+              <span class="text-xs text-purple-400 border border-purple-700/40 rounded-full px-2 py-0.5">Your ride</span>
+            </div>
+            <p class="text-zinc-500 text-xs">${escHtml(dateLabel)} &middot; ${escHtml(time)}</p>
+            <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-400">
+              <span>&#128100; You (Driver)</span>
+              <span>&#128722; ${escHtml(seats)} seat${seats > 1 ? 's' : ''}</span>
+              <span>&#128205; ${escHtml(point)}</span>
+            </div>
+          </div>
+          <button disabled class="shrink-0 text-xs font-semibold px-4 py-2 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-500 cursor-not-allowed">
+            Your Ride
+          </button>
+        </div>`;
+
+      const list = document.getElementById('rides-list');
+      list.insertBefore(card, list.firstChild);
+
+      const total = list.querySelectorAll('.ride-card').length;
+      document.getElementById('ride-count').textContent = `${total} rides`;
+
+      document.getElementById('create-ride-form').reset();
+    }
+
+    // Prevent XSS in injected card content
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+  </script>
+
+</body>
+</html>
