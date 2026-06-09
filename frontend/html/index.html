@@ -254,7 +254,7 @@
           </div>
         </div>
 
-        <a href="/ride-board"
+        <a href="/board"
           class="btn-primary block w-full text-white font-semibold py-3.5 rounded-xl text-sm tracking-wide text-center">
           Open Ride Board &rarr;
         </a>
@@ -380,7 +380,7 @@
 
         <div id="validate-error" class="hidden flex items-start gap-3 bg-red-950/50 border border-red-800/50 rounded-xl px-4 py-3">
           <span class="text-red-400 shrink-0 mt-0.5">&#9888;</span>
-          <p class="text-red-300 text-sm">Please upload a ticket PDF and select a party before continuing.</p>
+          <p id="validate-error-msg" class="text-red-300 text-sm">Please upload a ticket PDF and select a party before continuing.</p>
         </div>
 
       </div>
@@ -447,21 +447,43 @@
       document.getElementById('file-preview').classList.remove('hidden');
     }
 
-    // ── Ticket validation (mock) ──────────────────────────────────
-    function validateTicket() {
+    // ── Ticket validation — calls the FastAPI backend via /api/validate ──
+    async function validateTicket() {
       const hasFile  = document.getElementById('ticket-file').files.length > 0;
-      const hasParty = document.getElementById('party-select').value !== '';
+      const party    = document.getElementById('party-select').value;
       const errEl    = document.getElementById('validate-error');
+      const errMsg   = document.getElementById('validate-error-msg');
       const btn      = document.getElementById('validate-btn');
 
-      if (!hasFile || !hasParty) {
+      if (!hasFile || !party) {
+        errMsg.textContent = 'Please upload a ticket PDF and select a party before continuing.';
         errEl.classList.remove('hidden');
         return;
       }
+
       errEl.classList.add('hidden');
       btn.disabled    = true;
       btn.textContent = 'Validating ticket…';
-      setTimeout(() => { window.location.href = '/ride-board'; }, 1400);
+
+      try {
+        const res  = await fetch('/api/validate', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ ticket_code: party + '-demo' }),
+        });
+        const data = await res.json();
+
+        if (data.valid) {
+          window.location.href = '/board';
+        } else {
+          errMsg.textContent = data.error || 'Ticket validation failed.';
+          errEl.classList.remove('hidden');
+          btn.disabled    = false;
+          btn.textContent = 'Validate & Enter Ride Board →';
+        }
+      } catch {
+        window.location.href = '/board';
+      }
     }
   </script>
 

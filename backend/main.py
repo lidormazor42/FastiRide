@@ -1,33 +1,26 @@
 import os
-from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI
+from pydantic import BaseModel
 
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
 
 VALID_PREFIX = "ozora-"
 
 
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+class TicketRequest(BaseModel):
+    ticket_code: str
 
 
-@app.post("/validate")
-async def validate(request: Request, ticket_code: str = Form(...)):
-    if ticket_code.lower().startswith(VALID_PREFIX):
-        return RedirectResponse(url="/ride-board", status_code=303)
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "error": "Invalid ticket code. Must start with OZORA-"},
-        status_code=400,
-    )
+@app.get("/api/health")
+async def health():
+    return {"status": "ok"}
 
 
-@app.get("/ride-board", response_class=HTMLResponse)
-async def ride_board(request: Request):
-    return templates.TemplateResponse("board.html", {"request": request})
+@app.post("/api/validate")
+async def validate(body: TicketRequest):
+    if body.ticket_code.lower().startswith(VALID_PREFIX):
+        return {"valid": True}
+    return {"valid": False, "error": "Invalid ticket code. Must start with OZORA-"}
 
 
 if __name__ == "__main__":
