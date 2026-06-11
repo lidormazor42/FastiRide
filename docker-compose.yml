@@ -2,11 +2,34 @@ version: "3.9"
 
 services:
 
+  db:
+    image: postgres:16-alpine
+    container_name: fastiride-db
+    environment:
+      POSTGRES_USER: fastiride
+      POSTGRES_PASSWORD: fastiride
+      POSTGRES_DB: fastiride
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - fastiride-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fastiride"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build: ./backend
     container_name: fastiride-backend
+    env_file:
+      - .env
     environment:
       - PORT=8000
+      - DATABASE_URL=postgresql://fastiride:fastiride@db:5432/fastiride
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - fastiride-net
     healthcheck:
@@ -14,15 +37,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 5s
-    # No "ports:" here — backend is intentionally not reachable from the host.
-    # Only the frontend (Nginx) can reach it, via the internal Docker network.
+      start_period: 10s
 
   frontend:
     build: ./frontend
     container_name: fastiride-frontend
     ports:
       - "80:80"
+    volumes:
+      - ./frontend/html:/usr/share/nginx/html
     depends_on:
       backend:
         condition: service_healthy
@@ -32,3 +55,6 @@ services:
 networks:
   fastiride-net:
     driver: bridge
+
+volumes:
+  postgres_data:

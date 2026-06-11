@@ -1,321 +1,1059 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="he" dir="rtl" class="h-full">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FastiRide – Ride Board</title>
+  <title>FastiRide – לוח נסיעות</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: radial-gradient(ellipse at 30% 20%, #1a0533 0%, #0a0a14 55%, #00060f 100%); }
+    :root {
+      --bg:       #0b0b1a;
+      --surface:  #111128;
+      --violet:   #7c3aed;
+      --violet-l: #a78bfa;
+      --cyan:     #22d3ee;
+      --cyan-d:   #0891b2;
+      --rose:     #f43f5e;
+      --amber:    #f59e0b;
+      --green:    #22c55e;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+    }
 
-    .ride-card { transition: all 0.2s; }
-    .ride-card:hover {
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Heebo', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Background mesh ───────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 55% 45% at 10%  0%,   rgba(124,58,237,.35) 0%, transparent 65%),
+        radial-gradient(ellipse 45% 40% at 90%  85%,  rgba(34,211,238,.20) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 35% at 75%  15%,  rgba(99,102,241,.15) 0%, transparent 60%),
+        radial-gradient(ellipse 30% 25% at 50%  50%,  rgba(124,58,237,.08) 0%, transparent 70%);
+    }
+
+    /* ── Animations ─────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(16px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    @keyframes shimmerText {
+      0%   { background-position:-200% center; }
+      100% { background-position: 200% center; }
+    }
+    @keyframes cardSlideIn {
+      from { opacity:0; transform:translateY(20px) scale(.98); }
+      to   { opacity:1; transform:translateY(0)  scale(1); }
+    }
+    @keyframes skeletonPulse {
+      0%,100% { opacity:.35; }
+      50%      { opacity:.65; }
+    }
+    @keyframes glow {
+      0%,100% { box-shadow: 0 0 12px rgba(34,211,238,.3); }
+      50%      { box-shadow: 0 0 28px rgba(34,211,238,.6), 0 0 48px rgba(124,58,237,.3); }
+    }
+    @keyframes dotPulse {
+      0%,100% { opacity:1; }
+      50%      { opacity:.3; }
+    }
+    .fade-up { animation: fadeUp .55s ease-out both; }
+
+    /* ── Glass nav ──────────────────────────────── */
+    .nav-glass {
+      background: rgba(11,11,26,.8);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-bottom: 1px solid rgba(255,255,255,.07);
+    }
+
+    /* ── Gradient logo ──────────────────────────── */
+    .logo-text {
+      background: linear-gradient(120deg, #c4b5fd 0%, #818cf8 35%, #22d3ee 70%, #c4b5fd 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmerText 4s linear infinite;
+    }
+
+    /* ── Form panel ─────────────────────────────── */
+    .form-panel {
+      background: linear-gradient(145deg, rgba(18,16,44,.92) 0%, rgba(11,11,28,.97) 100%);
+      border: 1px solid rgba(124,58,237,.28);
+      border-radius: 1.5rem;
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      box-shadow: 0 8px 32px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    /* ── Inputs ─────────────────────────────────── */
+    .field {
+      background: rgba(0,0,0,.35);
+      border: 1px solid rgba(255,255,255,.08);
+      color: var(--text);
+      border-radius: .75rem;
+      padding: .6rem 1rem;
+      font-size: .875rem;
+      font-family: inherit;
+      width: 100%;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .field::placeholder { color: #475569; }
+    .field:focus {
+      outline: none;
+      border-color: rgba(124,58,237,.7);
+      box-shadow: 0 0 0 3px rgba(124,58,237,.12);
+    }
+    .select-wrapper { position:relative; }
+    .select-wrapper::after {
+      content:'';
+      position:absolute; top:50%; left:.875rem; transform:translateY(-50%);
+      pointer-events:none;
+      width:0; height:0;
+      border-left:4px solid transparent;
+      border-right:4px solid transparent;
+      border-top:5px solid #7c3aed;
+    }
+    select.field {
+      cursor:pointer; appearance:none; -webkit-appearance:none;
+      padding-left:2.25rem;
+      background: linear-gradient(135deg, rgba(20,18,45,.95) 0%, rgba(13,13,30,.98) 100%);
+      color: #e2e8f0;
+    }
+    select.field option {
+      background: #13111f;
+      color: #e2e8f0;
+    }
+    input[type="date"].field::-webkit-calendar-picker-indicator,
+    input[type="time"].field::-webkit-calendar-picker-indicator { filter:invert(.5); cursor:pointer; }
+
+    /* ── Submit btn ─────────────────────────────── */
+    .btn-submit {
+      width: 100%; border: none; cursor: pointer;
+      font-family: 'Outfit', inherit; font-weight: 800; font-size: .9rem;
+      padding: .95rem; border-radius: .95rem;
+      background: linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%);
+      color: #fff; letter-spacing: .03em;
+      transition: opacity .2s, transform .22s cubic-bezier(.34,1.4,.64,1), box-shadow .3s;
+      position: relative; overflow: hidden;
+      box-shadow: 0 4px 20px rgba(124,58,237,.35);
+    }
+    .btn-submit::before {
+      content:''; position:absolute; top:0; right:0; left:0; height:50%;
+      background: linear-gradient(180deg, rgba(255,255,255,.12) 0%, transparent 100%);
+      pointer-events:none;
+    }
+    .btn-submit::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.18) 0%, transparent 55%);
+      pointer-events: none;
+    }
+    .btn-submit:hover:not(:disabled) {
       transform: translateY(-2px);
-      box-shadow: 0 8px 28px rgba(168, 85, 247, 0.12);
-      border-color: rgba(168, 85, 247, 0.3);
+      box-shadow: 0 0 40px rgba(124,58,237,.6), 0 0 80px rgba(34,211,238,.2), 0 8px 30px rgba(0,0,0,.3);
     }
-    .btn-primary {
-      background: linear-gradient(135deg, #7c3aed, #a855f7);
-      transition: all 0.2s;
-    }
-    .btn-primary:hover { box-shadow: 0 0 22px rgba(168, 85, 247, 0.45); }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-submit:active:not(:disabled) { transform: scale(.98); }
+    .btn-submit:disabled { opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
 
-    input[type="text"], input[type="date"], input[type="time"], select { background: #09090f; }
-    input:focus, select:focus {
-      box-shadow: 0 0 0 1px #a855f7, 0 0 12px rgba(168, 85, 247, 0.12);
+    /* ══════════════════════════════════════════════
+       RIDE CARD — the centerpiece
+    ══════════════════════════════════════════════ */
+    .ride-card {
+      position: relative; overflow: hidden;
+      background: linear-gradient(145deg, rgba(22,18,52,.94) 0%, rgba(10,10,28,.97) 100%);
+      border: 1px solid rgba(124,58,237,.3);
+      border-radius: 1.4rem;
+      transition: transform .28s cubic-bezier(.34,1.2,.64,1), box-shadow .28s ease, border-color .25s ease;
+      animation: cardSlideIn .4s ease-out both;
+      cursor: default;
+      box-shadow: 0 4px 24px rgba(0,0,0,.3);
     }
+    .ride-card::before {
+      content:''; position:absolute; inset:0; pointer-events:none;
+      background: radial-gradient(ellipse 90% 70% at 0% 0%, rgba(124,58,237,.12) 0%, transparent 55%);
+    }
+    .ride-card:hover {
+      transform: translateY(-6px) scale(1.008);
+      border-color: rgba(124,58,237,.6);
+      box-shadow:
+        0 24px 70px rgba(0,0,0,.45),
+        0 0 0 1px rgba(124,58,237,.2),
+        0 0 40px rgba(124,58,237,.12),
+        inset 0 1px 0 rgba(255,255,255,.07);
+    }
+    .ride-card.is-dim { opacity:.38; }
+
+    /* Decorative top glow strip */
+    .ride-card .card-glow-strip {
+      position:absolute; top:0; right:0; left:0; height:1px;
+      background: linear-gradient(90deg, transparent, rgba(124,58,237,.6), rgba(34,211,238,.4), transparent);
+    }
+
+    /* ── Avatar ring ────────────────────────────── */
+    .avatar-ring {
+      border-radius: 50%;
+      box-shadow: 0 0 0 2px rgba(124,58,237,.65), 0 0 0 5px rgba(124,58,237,.15), 0 0 18px rgba(124,58,237,.25);
+    }
+
+
+
+    /* ── Join CTA button ────────────────────────── */
+    .btn-join {
+      position:relative; overflow:hidden; border:none; cursor:pointer;
+      font-family:'Outfit', inherit; font-weight:800; font-size:.8rem;
+      padding:.6rem 1.35rem; border-radius:.875rem; white-space:nowrap;
+      background: linear-gradient(135deg, #7c3aed 0%, #0891b2 100%);
+      color:#fff; letter-spacing:.03em;
+      transition: transform .22s cubic-bezier(.34,1.4,.64,1), box-shadow .2s;
+      animation: glow 3s ease-in-out infinite;
+      box-shadow: 0 4px 16px rgba(124,58,237,.4);
+    }
+    .btn-join::before {
+      content:''; position:absolute; top:0; right:0; left:0; height:50%;
+      background: linear-gradient(180deg, rgba(255,255,255,.15) 0%, transparent 100%);
+      pointer-events:none;
+    }
+    .btn-join:hover {
+      transform: translateY(-3px) scale(1.05);
+      box-shadow: 0 0 28px rgba(34,211,238,.55), 0 0 56px rgba(124,58,237,.3), 0 6px 20px rgba(0,0,0,.3);
+      animation: none;
+    }
+    .btn-join:active { transform:scale(.97); }
+    .btn-join:disabled { opacity:.35; cursor:not-allowed; animation:none; transform:none; box-shadow:none; }
+
+    /* Join states */
+    .btn-pending-state {
+      font-family:inherit; font-weight:600; font-size:.8rem;
+      padding:.55rem 1.1rem; border-radius:.75rem; white-space:nowrap;
+      background: rgba(245,158,11,.12);
+      border: 1px solid rgba(245,158,11,.35);
+      color: #fbbf24; cursor:default;
+    }
+    .btn-disabled-state {
+      font-family:inherit; font-weight:600; font-size:.8rem;
+      padding:.55rem 1.1rem; border-radius:.75rem; white-space:nowrap;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      color: #475569; cursor:not-allowed;
+    }
+
+    /* ── Badges ─────────────────────────────────── */
+    .badge {
+      display:inline-flex; align-items:center; gap:5px;
+      font-size:.7rem; font-weight:700; letter-spacing:.03em;
+      padding:.22rem .7rem; border-radius:999px;
+    }
+    .badge-open  { background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); color:#4ade80; }
+    .badge-full  { background:rgba(244,63,94,.1);  border:1px solid rgba(244,63,94,.3);  color:#fb7185; }
+    .badge-mine  { background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.35);color:#c4b5fd; }
+
+    /* ── Seat pill ──────────────────────────────── */
+    .seat-pill {
+      display:inline-flex; align-items:center; gap:4px;
+      font-size:.75rem; font-weight:600;
+      padding:.2rem .65rem; border-radius:999px;
+      background:rgba(34,211,238,.08);
+      border:1px solid rgba(34,211,238,.25);
+      color:#67e8f9;
+    }
+
+    /* ── Info chips ─────────────────────────────── */
+    .info-chip {
+      display:inline-flex; align-items:center; gap:5px;
+      font-size:.75rem; color:#64748b; font-weight:500;
+    }
+    .info-chip svg { flex-shrink:0; opacity:.7; }
+
+    /* ── Divider ────────────────────────────────── */
+    .card-divider {
+      height:1px; margin:.875rem 0;
+      background: linear-gradient(90deg, rgba(124,58,237,.2), rgba(34,211,238,.15), rgba(124,58,237,.2));
+    }
+
+    /* ── Skeleton ───────────────────────────────── */
+    .skeleton {
+      border-radius:.5rem;
+      background: rgba(255,255,255,.06);
+      animation: skeletonPulse 1.5s ease-in-out infinite;
+    }
+
+    /* ── Event header banner ────────────────────── */
+    .event-header-banner {
+      background: linear-gradient(135deg, rgba(124,58,237,.18) 0%, rgba(10,10,28,.9) 60%, rgba(34,211,238,.1) 100%);
+      border: 1px solid rgba(124,58,237,.4);
+      border-radius: 1.35rem;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+      position: relative; overflow: hidden;
+      box-shadow: 0 0 40px rgba(124,58,237,.15), inset 0 1px 0 rgba(255,255,255,.06);
+    }
+    .event-header-banner::before {
+      content:''; position:absolute; top:0; right:0; left:0; height:2px;
+      background: linear-gradient(90deg, transparent, rgba(124,58,237,.9), rgba(34,211,238,.7), rgba(124,58,237,.4), transparent);
+    }
+    .event-header-banner::after {
+      content:''; position:absolute; bottom:0; right:0; left:0; height:80px;
+      background: radial-gradient(ellipse 60% 100% at 50% 100%, rgba(124,58,237,.08) 0%, transparent 70%);
+      pointer-events:none;
+    }
+
+    /* ── Pickup highlight ───────────────────────── */
+    .pickup-highlight {
+      background: linear-gradient(135deg, rgba(34,211,238,.1) 0%, rgba(8,145,178,.06) 100%);
+      border: 1px solid rgba(34,211,238,.28);
+      border-radius: .75rem;
+      padding: .55rem .875rem;
+      display: flex; align-items: center; gap: .5rem;
+      box-shadow: 0 0 16px rgba(34,211,238,.08);
+    }
+
+    /* ── Empty state ────────────────────────────── */
+    .empty-icon-bg {
+      width:72px; height:72px; border-radius:50%;
+      background: rgba(124,58,237,.1);
+      border: 1px solid rgba(124,58,237,.2);
+      display:flex; align-items:center; justify-content:center;
+      margin: 0 auto 1.25rem;
+    }
+
+    /* ── Event badge ────────────────────────────── */
+    .event-pill {
+      display:inline-flex; align-items:center; gap:.5rem;
+      background:rgba(124,58,237,.1); border:1px solid rgba(124,58,237,.25);
+      border-radius:999px; padding:.3rem .85rem;
+      font-size:.75rem; font-weight:500; color:#c4b5fd;
+    }
+
+    /* ── Requests banner ────────────────────────── */
+    .banner-pending {
+      background:rgba(245,158,11,.07);
+      border:1px solid rgba(245,158,11,.25);
+      border-radius:1rem; padding:.75rem 1rem;
+    }
+
+    /* ── Scrollbar ──────────────────────────────── */
+    ::-webkit-scrollbar { width:6px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:rgba(124,58,237,.3); border-radius:3px; }
   </style>
 </head>
-<body class="min-h-screen text-zinc-100">
+<body>
 
-  <!-- ambient blobs -->
-  <div class="fixed top-0 left-0 w-96 h-96 bg-purple-900/15 rounded-full blur-3xl pointer-events-none"></div>
-  <div class="fixed bottom-0 right-0 w-80 h-80 bg-violet-900/10 rounded-full blur-3xl pointer-events-none"></div>
+  <!-- ══════════════ NAV ══════════════ -->
+  <nav class="sticky top-0 z-20 nav-glass">
+    <div class="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
 
-
-  <!-- ════════════════════════════════════════════════════════════
-       NAV
-  ════════════════════════════════════════════════════════════ -->
-  <nav class="sticky top-0 z-10 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800/60">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-
-      <div class="flex items-center gap-2">
-        <span class="text-xl">⚡</span>
-        <span class="text-lg font-extrabold tracking-tight bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">FastiRide</span>
+      <div class="flex items-center gap-2.5">
+        <!-- Lightning bolt SVG -->
+        <div style="width:30px;height:30px;border-radius:8px;background:rgba(124,58,237,.18);border:1px solid rgba(124,58,237,.3);display:flex;align-items:center;justify-content:center;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="url(#lg1)" stroke="url(#lg1)" stroke-width="1" stroke-linejoin="round"/>
+            <defs><linearGradient id="lg1" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#a78bfa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+          </svg>
+        </div>
+        <span class="logo-text text-base font-extrabold tracking-tight">FastiRide</span>
       </div>
 
       <div class="flex items-center gap-3">
-        <span class="hidden sm:flex items-center gap-1.5 bg-zinc-900 border border-zinc-700/60 rounded-full px-3 py-1.5 text-xs">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span class="text-zinc-400">Ride Sharing Platform</span>
+        <span id="event-badge" class="hidden sm:inline-flex event-pill">
+          <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;animation:dotPulse 2s infinite;flex-shrink:0;"></span>
+          <span id="event-name-badge">טוען...</span>
         </span>
-        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold shrink-0">JD</div>
+        <div style="position:relative;flex-shrink:0;" title="לחץ לשינוי תמונת פרופיל">
+          <div id="user-avatar" onclick="document.getElementById('avatar-upload').click()"
+            style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#22d3ee);display:flex;align-items:center;justify-content:center;color:#fff;font-size:.7rem;font-weight:700;cursor:pointer;box-shadow:0 0 0 2px rgba(124,58,237,.3),0 0 12px rgba(124,58,237,.2);overflow:hidden;transition:opacity .2s;" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">?</div>
+          <input id="avatar-upload" type="file" accept="image/*" style="display:none;" onchange="changeAvatar(this)" />
+        </div>
       </div>
 
     </div>
   </nav>
 
+  <!-- ══════════════ PAGE CONTENT ══════════════ -->
+  <div style="position:relative;z-index:1;">
 
-  <!-- ════════════════════════════════════════════════════════════
-       PAGE HEADER
-  ════════════════════════════════════════════════════════════ -->
-  <div class="max-w-6xl mx-auto px-4 pt-8 pb-6">
-    <h1 class="text-2xl font-bold text-white">Ride Board</h1>
-    <p class="text-zinc-500 text-sm mt-1">Find a ride or offer one to fellow festival goers.</p>
-  </div>
+    <!-- Header -->
+    <div class="max-w-6xl mx-auto px-4 pt-8 pb-6 fade-up">
+      <h1 style="font-size:2rem;font-weight:900;color:#f1f5f9;letter-spacing:-.03em;font-family:'Outfit',sans-serif;">לוח נסיעות</h1>
+      <p style="font-size:.875rem;color:#64748b;margin-top:.35rem;">מצא נסיעה פתוחה או פרסם אחת לחברים לאירוע.</p>
+    </div>
 
+    <div class="max-w-6xl mx-auto px-4 pb-24">
+      <div style="display:grid;grid-template-columns:1fr;gap:1.5rem;" id="main-grid">
 
-  <!-- ════════════════════════════════════════════════════════════
-       MAIN LAYOUT
-  ════════════════════════════════════════════════════════════ -->
-  <div class="max-w-6xl mx-auto px-4 pb-16">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <!-- ── Create ride form ── -->
+        <div style="grid-column:1;" id="form-col">
+          <div class="form-panel p-6 fade-up" style="position:sticky;top:4.5rem;">
 
-
-      <!-- ── LEFT: Create Ride ──────────────────────────────────── -->
-      <div class="lg:col-span-1">
-        <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-6 lg:sticky lg:top-24">
-
-          <h2 class="text-white font-semibold mb-0.5">Create a Ride</h2>
-          <p class="text-zinc-500 text-xs mb-5">Offer seats and let others join your ride to the festival.</p>
-
-          <form id="create-ride-form" onsubmit="createRide(event)" class="space-y-4">
-
-            <div>
-              <label class="block text-xs text-zinc-500 mb-1.5">Departure City</label>
-              <input id="r-city" type="text" placeholder="e.g. Budapest" required
-                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+            <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.3rem;">
+              <div style="width:34px;height:34px;border-radius:10px;background:rgba(124,58,237,.2);border:1px solid rgba(124,58,237,.4);display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(124,58,237,.25);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+                </svg>
+              </div>
+              <span style="font-size:1rem;font-weight:800;color:#f1f5f9;font-family:'Outfit',sans-serif;letter-spacing:-.02em;">פרסם נסיעה</span>
             </div>
+            <p style="font-size:.78rem;color:#4a5568;margin-bottom:1.35rem;padding-right:.5rem;">הצע מקומות ותן לאחרים להצטרף לנסיעה שלך.</p>
 
-            <div>
-              <label class="block text-xs text-zinc-500 mb-1.5">Pickup Point</label>
-              <input id="r-point" type="text" placeholder="e.g. Keleti Station, Gate B" required
-                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
-            </div>
+            <form id="create-ride-form" onsubmit="createRide(event)" style="display:flex;flex-direction:column;gap:.875rem;">
 
-            <div class="grid grid-cols-2 gap-3">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.75rem;">
+                <div>
+                  <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">שם שלך</label>
+                  <input id="r-driver" type="text" placeholder="ישראל ישראלי" required class="field" />
+                </div>
+                <div>
+                  <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">גיל</label>
+                  <input id="r-age" type="number" placeholder="25" min="16" max="99" class="field" />
+                </div>
+              </div>
+
               <div>
-                <label class="block text-xs text-zinc-500 mb-1.5">Date</label>
-                <input id="r-date" type="date" required
-                  class="w-full border border-zinc-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors" />
+                <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">אירוע</label>
+                <select id="r-event" required class="field">
+                  <option value="">טוען...</option>
+                </select>
               </div>
+
               <div>
-                <label class="block text-xs text-zinc-500 mb-1.5">Time</label>
-                <input id="r-time" type="time" required
-                  class="w-full border border-zinc-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors" />
+                <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">עיר יציאה</label>
+                <input id="r-city" type="text" placeholder="תל אביב" required class="field" />
               </div>
-            </div>
 
-            <div>
-              <label class="block text-xs text-zinc-500 mb-1.5">Empty Seats</label>
-              <select id="r-seats"
-                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors appearance-none cursor-pointer">
-                <option value="1">1 seat</option>
-                <option value="2" selected>2 seats</option>
-                <option value="3">3 seats</option>
-                <option value="4">4 seats</option>
-                <option value="5">5 seats</option>
-              </select>
-            </div>
+              <div>
+                <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">נקודת איסוף</label>
+                <input id="r-point" type="text" placeholder="תחנת רכבת מרכז, כניסה B" required class="field" />
+              </div>
 
-            <button type="submit" class="btn-primary w-full text-white font-semibold py-3 rounded-xl text-sm tracking-wide">
-              Post Ride &rarr;
-            </button>
+              <div>
+                <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">שעת יציאה</label>
+                <input id="r-time" type="time" required class="field" />
+              </div>
 
-          </form>
+              <div>
+                <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">
+                  סוג רכב
+                  <span style="font-size:.68rem;color:#334155;font-weight:400;margin-right:.3rem;">(אופציונלי)</span>
+                </label>
+                <input id="r-vehicle" list="vehicle-suggestions" class="field" placeholder="למשל: Tesla Model 3, Kia Sportage..." autocomplete="off" />
+                <datalist id="vehicle-suggestions">
+                  <option value="Sedan">
+                  <option value="SUV / Crossover">
+                  <option value="Hatchback">
+                  <option value="Minivan">
+                  <option value="Pickup Truck">
+                  <option value="Electric Car">
+                  <option value="Sports Car">
+                  <option value="Motorcycle">
+                </datalist>
+              </div>
+
+              <div>
+                <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">מקומות פנויים</label>
+                <select id="r-seats" class="field">
+                  <option value="1">1 מקום</option>
+                  <option value="2" selected>2 מקומות</option>
+                  <option value="3">3 מקומות</option>
+                  <option value="4">4 מקומות</option>
+                  <option value="5">5 מקומות</option>
+                </select>
+              </div>
+
+              <p id="create-error" style="display:none;font-size:.78rem;color:#fb7185;"></p>
+
+              <button type="submit" id="create-btn" class="btn-submit" style="margin-top:.25rem;">
+                פרסם נסיעה ←
+              </button>
+
+            </form>
+          </div>
         </div>
+
+        <!-- ── Rides list ── -->
+        <div style="grid-column:1;" id="rides-col">
+
+          <!-- Event header banner (shown after events load) -->
+          <div id="event-header" style="display:none;" class="event-header-banner fade-up">
+            <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.35rem;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="url(#eh-lg)" stroke="url(#eh-lg)" stroke-width="1" stroke-linejoin="round"/>
+                <defs><linearGradient id="eh-lg" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#a78bfa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+              </svg>
+              <span id="event-header-name" style="font-size:1rem;font-weight:800;color:#f1f5f9;letter-spacing:-.01em;"></span>
+            </div>
+            <div style="display:flex;align-items:center;gap:.4rem;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+              </svg>
+              <span style="font-size:.75rem;color:#7c6fb0;font-weight:500;">קבוצה זו מיועדת לבעלי כרטיסים בלבד · אומתת על ידי FastiRide</span>
+            </div>
+          </div>
+
+          <!-- List header -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;" class="fade-up">
+            <h2 style="font-size:1rem;font-weight:700;color:#e2e8f0;">נסיעות זמינות</h2>
+            <span id="ride-count"
+              style="font-size:.72rem;font-weight:600;color:#64748b;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:999px;padding:.2rem .75rem;">
+              טוען...
+            </span>
+          </div>
+
+          <!-- Pending banner -->
+          <div id="requests-banner" style="display:none;margin-bottom:1rem;" class="banner-pending">
+            <div style="display:flex;align-items:center;gap:.6rem;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              <p style="font-size:.78rem;color:#fcd34d;">יש לך בקשות הצטרפות ממתינות — הנהגים יאשרו אותן בקרוב.</p>
+            </div>
+          </div>
+
+          <!-- Cards -->
+          <div id="rides-list" style="display:flex;flex-direction:column;gap:.875rem;">
+            <!-- Skeleton cards -->
+            <div class="ride-card" style="padding:1.25rem;">
+              <div style="display:flex;align-items:center;gap:.875rem;margin-bottom:1rem;">
+                <div class="skeleton" style="width:48px;height:48px;border-radius:50%;flex-shrink:0;"></div>
+                <div style="flex:1;">
+                  <div class="skeleton" style="height:14px;width:120px;margin-bottom:6px;"></div>
+                  <div class="skeleton" style="height:11px;width:80px;"></div>
+                </div>
+              </div>
+              <div class="skeleton" style="height:22px;width:200px;margin-bottom:8px;border-radius:.75rem;"></div>
+              <div class="skeleton" style="height:11px;width:150px;"></div>
+            </div>
+            <div class="ride-card" style="padding:1.25rem;animation-delay:.08s;">
+              <div style="display:flex;align-items:center;gap:.875rem;margin-bottom:1rem;">
+                <div class="skeleton" style="width:48px;height:48px;border-radius:50%;flex-shrink:0;"></div>
+                <div style="flex:1;">
+                  <div class="skeleton" style="height:14px;width:100px;margin-bottom:6px;"></div>
+                  <div class="skeleton" style="height:11px;width:70px;"></div>
+                </div>
+              </div>
+              <div class="skeleton" style="height:22px;width:180px;margin-bottom:8px;border-radius:.75rem;"></div>
+              <div class="skeleton" style="height:11px;width:130px;"></div>
+            </div>
+          </div>
+
+        </div>
+
       </div>
+    </div>
 
-
-      <!-- ── RIGHT: Available Rides ─────────────────────────────── -->
-      <div class="lg:col-span-2 space-y-4">
-
-        <div class="flex items-center justify-between">
-          <h2 class="text-white font-semibold">Available Rides</h2>
-          <span id="ride-count" class="text-xs text-zinc-500">4 rides</span>
-        </div>
-
-        <!-- My requests summary (hidden until a join is made) -->
-        <div id="requests-banner" class="hidden flex items-center gap-3 bg-yellow-950/40 border border-yellow-800/40 rounded-xl px-4 py-3">
-          <span class="text-yellow-400 text-sm">⏳</span>
-          <p class="text-yellow-300 text-xs">You have pending join requests. Drivers will approve or reject them shortly.</p>
-        </div>
-
-        <div id="rides-list" class="space-y-3">
-
-          <!-- Ride 1: Budapest → Ozora -->
-          <div class="ride-card bg-zinc-900/70 border border-zinc-700/50 rounded-2xl p-5">
-            <div class="flex items-start justify-between gap-4 flex-wrap">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap mb-1">
-                  <h3 class="text-white font-semibold text-sm">Budapest &rarr; Ozora</h3>
-                  <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Open
-                  </span>
-                </div>
-                <p class="text-zinc-500 text-xs">Fri 18 Jul &middot; 08:00</p>
-                <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-400">
-                  <span>&#128100; Anna K.</span>
-                  <span>&#128722; 3 seats</span>
-                  <span>&#128205; Keleti Station, Gate B</span>
-                </div>
-              </div>
-              <button onclick="joinRide(this)"
-                class="shrink-0 text-xs font-semibold px-4 py-2 rounded-xl bg-purple-950 border border-purple-700/60 text-purple-300 hover:bg-purple-900 transition-colors">
-                Request to Join
-              </button>
-            </div>
-          </div>
-
-          <!-- Ride 2: Vienna → Ozora -->
-          <div class="ride-card bg-zinc-900/70 border border-zinc-700/50 rounded-2xl p-5">
-            <div class="flex items-start justify-between gap-4 flex-wrap">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap mb-1">
-                  <h3 class="text-white font-semibold text-sm">Vienna &rarr; Ozora</h3>
-                  <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Open
-                  </span>
-                </div>
-                <p class="text-zinc-500 text-xs">Fri 18 Jul &middot; 06:30</p>
-                <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-400">
-                  <span>&#128100; Marco R.</span>
-                  <span>&#128722; 1 seat</span>
-                  <span>&#128205; Westbahnhof, main exit</span>
-                </div>
-              </div>
-              <button onclick="joinRide(this)"
-                class="shrink-0 text-xs font-semibold px-4 py-2 rounded-xl bg-purple-950 border border-purple-700/60 text-purple-300 hover:bg-purple-900 transition-colors">
-                Request to Join
-              </button>
-            </div>
-          </div>
-
-          <!-- Ride 3: Prague → Ozora (FULL) -->
-          <div class="ride-card bg-zinc-900/50 border border-zinc-700/30 rounded-2xl p-5 opacity-55">
-            <div class="flex items-start justify-between gap-4 flex-wrap">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap mb-1">
-                  <h3 class="text-zinc-400 font-semibold text-sm">Prague &rarr; Ozora</h3>
-                  <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-950 text-red-400 border border-red-800/60">
-                    <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>Full
-                  </span>
-                </div>
-                <p class="text-zinc-600 text-xs">Thu 17 Jul &middot; 14:00</p>
-                <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-600">
-                  <span>&#128100; Jana S.</span>
-                  <span>&#128722; 0 seats</span>
-                  <span>&#128205; Main Square</span>
-                </div>
-              </div>
-              <button disabled
-                class="shrink-0 text-xs font-semibold px-4 py-2 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-600 cursor-not-allowed">
-                Full
-              </button>
-            </div>
-          </div>
-
-          <!-- Ride 4: Ozora → Budapest -->
-          <div class="ride-card bg-zinc-900/70 border border-zinc-700/50 rounded-2xl p-5">
-            <div class="flex items-start justify-between gap-4 flex-wrap">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap mb-1">
-                  <h3 class="text-white font-semibold text-sm">Ozora &rarr; Budapest</h3>
-                  <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Open
-                  </span>
-                </div>
-                <p class="text-zinc-500 text-xs">Mon 22 Jul &middot; 16:00</p>
-                <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-400">
-                  <span>&#128100; David L.</span>
-                  <span>&#128722; 2 seats</span>
-                  <span>&#128205; Festival main gate</span>
-                </div>
-              </div>
-              <button onclick="joinRide(this)"
-                class="shrink-0 text-xs font-semibold px-4 py-2 rounded-xl bg-purple-950 border border-purple-700/60 text-purple-300 hover:bg-purple-900 transition-colors">
-                Request to Join
-              </button>
-            </div>
-          </div>
-
-        </div><!-- /rides-list -->
-      </div>
-
+    <!-- Footer -->
+    <div style="text-align:center;padding-bottom:3rem;position:relative;z-index:1;">
+      <a href="/" style="font-size:.75rem;color:#334155;text-decoration:none;transition:color .2s;"
+         onmouseover="this.style.color='#a78bfa'" onmouseout="this.style.color='#334155'">← חזרה לדף הבית</a>
     </div>
   </div>
 
-
-  <!-- ── Footer ─────────────────────────────────────────────────── -->
-  <div class="text-center py-8">
-    <a href="/" class="text-zinc-600 hover:text-purple-400 text-sm transition-colors">&larr; Back to home</a>
-  </div>
-
-
   <script>
-    // ── Join Ride ─────────────────────────────────────────────────
-    function joinRide(btn) {
-      btn.disabled  = true;
-      btn.innerHTML = '&#9203; Pending';
-      btn.className = 'shrink-0 text-xs font-semibold px-4 py-2 rounded-xl bg-yellow-950 border border-yellow-700/50 text-yellow-400 cursor-default';
-      document.getElementById('requests-banner').classList.remove('hidden');
+    /* ── Responsive grid ───────────────────────── */
+    function applyGrid() {
+      const g = document.getElementById('main-grid');
+      const fc = document.getElementById('form-col');
+      const rc = document.getElementById('rides-col');
+      if (window.innerWidth >= 1024) {
+        g.style.gridTemplateColumns = '1fr 2fr';
+        fc.style.gridColumn = '1';
+        rc.style.gridColumn = '2';
+      } else {
+        g.style.gridTemplateColumns = '1fr';
+        fc.style.gridColumn = '1';
+        rc.style.gridColumn = '1';
+      }
+    }
+    applyGrid();
+    window.addEventListener('resize', applyGrid);
+
+    /* ── Read Google OAuth params ──────────────── */
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('name')) {
+      sessionStorage.setItem('username', params.get('name'));
+      sessionStorage.setItem('picture',  params.get('picture'));
+      sessionStorage.setItem('email',    params.get('email'));
+      window.history.replaceState({}, '', '/board');
     }
 
-    // ── Create Ride ───────────────────────────────────────────────
-    function createRide(e) {
-      e.preventDefault();
+    const username = sessionStorage.getItem('username') || 'אורח';
+    const picture  = sessionStorage.getItem('picture')  || '';
+    const eventId  = sessionStorage.getItem('eventId');
 
-      const city  = document.getElementById('r-city').value;
-      const point = document.getElementById('r-point').value;
-      const date  = document.getElementById('r-date').value;
-      const time  = document.getElementById('r-time').value;
-      const seats = document.getElementById('r-seats').value;
+    /* ── Avatar ────────────────────────────────── */
+    const avatarEl = document.getElementById('user-avatar');
+    function renderAvatar(src) {
+      if (src) {
+        avatarEl.innerHTML = `<img src="${src}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" referrerpolicy="no-referrer" />`;
+        avatarEl.style.background = 'transparent';
+      } else {
+        const initials = username.split(' ').map(p => p[0]?.toUpperCase() || '').slice(0,2).join('');
+        avatarEl.innerHTML = '';
+        avatarEl.textContent = initials || 'GS';
+        avatarEl.style.background = 'linear-gradient(135deg,#7c3aed,#22d3ee)';
+      }
+    }
+    renderAvatar(picture);
 
-      const dateLabel = date
-        ? new Date(date + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' })
-        : '';
+    function changeAvatar(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target.result;
+        sessionStorage.setItem('picture', dataUrl);
+        renderAvatar(dataUrl);
+      };
+      reader.readAsDataURL(file);
+    }
+    document.getElementById('r-driver').value = username;
 
-      const card = document.createElement('div');
-      card.className = 'ride-card bg-zinc-900/70 border border-purple-700/40 rounded-2xl p-5 ring-1 ring-purple-700/20';
-      card.innerHTML = `
-        <div class="flex items-start justify-between gap-4 flex-wrap">
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 flex-wrap mb-1">
-              <h3 class="text-white font-semibold text-sm">${escHtml(city)} &rarr; Ozora</h3>
-              <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Open
+    /* ── Generate avatar colors deterministically ─ */
+    function nameToGradient(name) {
+      let h = 0;
+      for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff;
+      const hue1 = Math.abs(h) % 360;
+      const hue2 = (hue1 + 40) % 360;
+      return `linear-gradient(135deg, hsl(${hue1},70%,55%), hsl(${hue2},80%,45%))`;
+    }
+
+    /* ── Load events ───────────────────────────── */
+    async function loadEvents() {
+      try {
+        const events = await fetch('/api/events').then(r => r.json());
+        const sel = document.getElementById('r-event');
+        sel.innerHTML = '<option value="">בחר אירוע</option>';
+        events.forEach(ev => {
+          const selected = ev.id == eventId ? 'selected' : '';
+          sel.innerHTML += `<option value="${ev.id}" ${selected}>${ev.name}</option>`;
+        });
+        if (eventId) {
+          const cur = events.find(e => e.id == eventId);
+          if (cur) {
+            document.getElementById('event-name-badge').textContent = cur.name;
+            document.getElementById('event-badge').style.display = 'inline-flex';
+            // Show event header banner
+            document.getElementById('event-header-name').textContent = cur.name;
+            document.getElementById('event-header').style.display = 'block';
+          }
+        }
+      } catch {}
+    }
+
+    /* ── Load rides ────────────────────────────── */
+    async function loadRides() {
+      try {
+        const url = eventId ? `/api/rides?event_id=${eventId}` : '/api/rides';
+        const rides = await fetch(url).then(r => r.json());
+        renderRides(rides);
+      } catch {
+        document.getElementById('rides-list').innerHTML =
+          `<div style="text-align:center;padding:3rem 0;color:#f87171;font-size:.875rem;">שגיאה בטעינת נסיעות.</div>`;
+      }
+    }
+
+    /* ── Ride data store (for edit modal) ─────── */
+    const ridesStore = {};
+
+    /* ── Render rides ──────────────────────────── */
+    function renderRides(rides) {
+      const list  = document.getElementById('rides-list');
+      const count = document.getElementById('ride-count');
+      count.textContent = rides.length ? `${rides.length} נסיעות` : '0 נסיעות';
+
+      if (!rides.length) {
+        list.innerHTML = `
+          <div style="text-align:center;padding:4rem 1rem;" class="fade-up">
+            <div class="empty-icon-bg">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/><rect width="13" height="8" x="8" y="13" rx="2"/>
+                <circle cx="10" cy="21" r="1"/><circle cx="17" cy="21" r="1"/>
+              </svg>
+            </div>
+            <p style="font-size:.95rem;font-weight:600;color:#94a3b8;margin-bottom:.4rem;">אין נסיעות עדיין</p>
+            <p style="font-size:.8rem;color:#475569;">היה הראשון לפרסם נסיעה לאירוע!</p>
+          </div>`;
+        return;
+      }
+
+      rides.forEach(r => { ridesStore[r.id] = r; });
+
+      list.innerHTML = rides.map((ride, i) => {
+        const isOwn  = ride.driver_name === username;
+        const isFull = ride.seats_available <= 0;
+        const dim    = isFull && !isOwn;
+        const delay  = i * 0.07;
+
+        /* Status badge */
+        const statusBadge = isFull
+          ? `<span class="badge badge-full"><span style="width:6px;height:6px;border-radius:50%;background:#fb7185;display:inline-block;"></span>מלא</span>`
+          : `<span class="badge badge-open"><span style="width:6px;height:6px;border-radius:50%;background:#4ade80;display:inline-block;"></span>פתוח</span>`;
+
+        const ownBadge = isOwn
+          ? `<span class="badge badge-mine">הנסיעה שלך</span>` : '';
+
+        /* Age display */
+        const ageDisplay = ride.driver_age
+          ? `<span style="font-size:.72rem;color:#a78bfa;font-weight:600;background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.25);border-radius:999px;padding:.1rem .5rem;">${ride.driver_age}</span>`
+          : '';
+
+        /* Action button */
+        const actionBtn = isOwn
+          ? `<div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+               <button onclick="openEditRide(${ride.id})"
+                 style="font-family:inherit;font-size:.78rem;font-weight:600;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;white-space:nowrap;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.3);color:#a78bfa;transition:background .2s;"
+                 onmouseover="this.style.background='rgba(124,58,237,.2)'" onmouseout="this.style.background='rgba(124,58,237,.1)'">
+                 ערוך נסיעה
+               </button>
+               <button onclick="cancelRide(this,${ride.id})" class="btn-cancel"
+                 style="font-family:inherit;font-size:.78rem;font-weight:600;padding:.5rem 1rem;border-radius:.7rem;cursor:pointer;white-space:nowrap;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.3);color:#fb7185;transition:background .2s,box-shadow .2s;"
+                 onmouseover="this.style.background='rgba(244,63,94,.16)';this.style.boxShadow='0 0 16px rgba(244,63,94,.25)'"
+                 onmouseout="this.style.background='rgba(244,63,94,.08)';this.style.boxShadow=''">
+                 בטל נסיעה
+               </button>
+             </div>`
+          : isFull
+          ? `<button disabled class="btn-disabled-state">מלא</button>`
+          : `<button onclick="joinRide(this,${ride.id})" class="btn-join">הצטרף ←</button>`;
+
+        /* Avatar — real photo if available, otherwise initials */
+        const driverName = escHtml(ride.driver_name);
+        const grad       = nameToGradient(ride.driver_name || 'default');
+        const initials   = (ride.driver_name || 'A').split(' ').map(p=>p[0]?.toUpperCase()||'').slice(0,2).join('') || '?';
+        const avatarInner = ride.driver_photo
+          ? `<img src="${escHtml(ride.driver_photo)}" style="width:100%;height:100%;object-fit:cover;" referrerpolicy="no-referrer" />`
+          : `<span style="font-size:.9rem;font-weight:700;color:#fff;">${initials}</span>`;
+        const avatarBg = ride.driver_photo ? 'transparent' : grad;
+
+        /* Vehicle label map */
+        const vehicleLabels = {
+          sedan:'Sedan', suv:'SUV / Crossover', hatchback:'Hatchback',
+          minivan:'Minivan', pickup:'Pickup Truck', electric:'Electric Car',
+          sports:'Sports Car', other:'Other'
+        };
+        const vehicleDisplay = ride.vehicle_type
+          ? `<span style="display:inline-flex;align-items:center;gap:.35rem;font-size:.7rem;font-weight:600;color:#a78bfa;background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.25);border-radius:999px;padding:.15rem .6rem;letter-spacing:.01em;">
+               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+               ${vehicleLabels[ride.vehicle_type] || ride.vehicle_type}
+             </span>`
+          : '';
+
+        return `
+          <div class="ride-card${dim ? ' is-dim' : ''}" id="ride-${ride.id}" style="padding:1.25rem;animation-delay:${delay}s;">
+            <div class="card-glow-strip"></div>
+
+            <!-- Driver row -->
+            <div style="display:flex;align-items:center;gap:.875rem;margin-bottom:.875rem;">
+              <div class="avatar-ring" onclick="showDriverProfile('${driverName}',${ride.driver_age||'null'},'${ride.driver_photo ? escHtml(ride.driver_photo) : ''}','${escHtml(ride.city||'')}','${avatarBg}')" style="width:54px;height:54px;flex-shrink:0;overflow:hidden;background:${avatarBg};display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;transition:transform .15s,box-shadow .15s;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'">
+                ${avatarInner}
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem;flex-wrap:wrap;">
+                  <span style="font-size:1.05rem;font-weight:700;color:#f1f5f9;">${driverName}</span>
+                  ${ageDisplay}
+                  ${vehicleDisplay}
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.4rem;flex-shrink:0;">
+                ${statusBadge}
+                ${ownBadge}
+              </div>
+            </div>
+
+            <div class="card-divider"></div>
+
+            <!-- Location block: departure city + pickup point -->
+            <div style="display:flex;flex-direction:column;gap:.55rem;margin-bottom:.875rem;">
+
+              <!-- עיר יציאה -->
+              <div style="display:flex;align-items:center;gap:.5rem;">
+                <span style="font-size:.68rem;font-weight:600;color:#7c6fb0;white-space:nowrap;min-width:64px;text-align:right;">עיר יציאה</span>
+                <div style="display:flex;align-items:center;gap:.4rem;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.18);border-radius:.6rem;padding:.3rem .65rem;flex:1;min-width:0;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                  <span style="font-size:.88rem;font-weight:700;color:#c4b5fd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(ride.city)}</span>
+                </div>
+              </div>
+
+              <!-- שעת יציאה -->
+              <div style="display:flex;align-items:center;gap:.5rem;">
+                <span style="font-size:.68rem;font-weight:600;color:#475569;white-space:nowrap;min-width:64px;text-align:right;">שעת יציאה</span>
+                <div style="display:flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:.6rem;padding:.3rem .65rem;flex:1;min-width:0;">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span style="font-size:.88rem;font-weight:600;color:#cbd5e1;">${escHtml(ride.departure_time)}</span>
+                </div>
+              </div>
+
+              <!-- נקודת איסוף -->
+              <div style="display:flex;align-items:center;gap:.5rem;">
+                <span style="font-size:.68rem;font-weight:600;color:#0e9ab5;white-space:nowrap;min-width:64px;text-align:right;">נקודת איסוף</span>
+                <div class="pickup-highlight" style="flex:1;min-width:0;margin-bottom:0;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  <span style="font-size:.9rem;font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(ride.pickup_point)}</span>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Bottom row: seats + CTA -->
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;">
+              <span class="seat-pill">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                ${ride.seats_available} מקומות פנויים
               </span>
-              <span class="text-xs text-purple-400 border border-purple-700/40 rounded-full px-2 py-0.5">Your ride</span>
+              ${actionBtn}
             </div>
-            <p class="text-zinc-500 text-xs">${escHtml(dateLabel)} &middot; ${escHtml(time)}</p>
-            <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-400">
-              <span>&#128100; You (Driver)</span>
-              <span>&#128722; ${escHtml(seats)} seat${seats > 1 ? 's' : ''}</span>
-              <span>&#128205; ${escHtml(point)}</span>
-            </div>
-          </div>
-          <button disabled class="shrink-0 text-xs font-semibold px-4 py-2 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-500 cursor-not-allowed">
-            Your Ride
-          </button>
-        </div>`;
 
-      const list = document.getElementById('rides-list');
-      list.insertBefore(card, list.firstChild);
-
-      const total = list.querySelectorAll('.ride-card').length;
-      document.getElementById('ride-count').textContent = `${total} rides`;
-
-      document.getElementById('create-ride-form').reset();
+          </div>`;
+      }).join('');
     }
 
-    // Prevent XSS in injected card content
+    /* ── Create ride ───────────────────────────── */
+    async function createRide(e) {
+      e.preventDefault();
+      const btn   = document.getElementById('create-btn');
+      const errEl = document.getElementById('create-error');
+      const evtId = document.getElementById('r-event').value;
+
+      if (!evtId) {
+        errEl.textContent = 'יש לבחור אירוע.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled    = true;
+      btn.textContent = 'מפרסם...';
+      errEl.style.display = 'none';
+
+      try {
+        const ageVal     = document.getElementById('r-age').value;
+        const vehicleVal = document.getElementById('r-vehicle').value;
+        const res = await fetch('/api/rides', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_id:        parseInt(evtId),
+            driver_name:     document.getElementById('r-driver').value,
+            driver_age:      ageVal ? parseInt(ageVal) : null,
+            driver_photo:    picture || null,
+            vehicle_type:    vehicleVal || null,
+            city:            document.getElementById('r-city').value,
+            pickup_point:    document.getElementById('r-point').value,
+            departure_time:  document.getElementById('r-time').value,
+            seats_available: parseInt(document.getElementById('r-seats').value),
+          })
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'שגיאה'); }
+
+        document.getElementById('create-ride-form').reset();
+        document.getElementById('r-driver').value = username;
+        await loadEvents();
+        await loadRides();
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = 'פרסם נסיעה ←';
+      }
+    }
+
+    /* ── Cancel ride ──────────────────────────── */
+    async function cancelRide(btn, rideId) {
+      if (!confirm('לבטל את הנסיעה? הפעולה לא ניתנת לביטול.')) return;
+      btn.disabled    = true;
+      btn.textContent = 'מבטל...';
+      try {
+        const res = await fetch(`/api/rides/${rideId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error();
+        const card = document.getElementById(`ride-${rideId}`);
+        if (card) {
+          card.style.transition = 'opacity .3s, transform .3s';
+          card.style.opacity    = '0';
+          card.style.transform  = 'scale(.96)';
+          setTimeout(() => { card.remove(); refreshCount(); }, 320);
+        }
+      } catch {
+        btn.disabled    = false;
+        btn.textContent = 'בטל נסיעה';
+      }
+    }
+
+    function refreshCount() {
+      const cards = document.querySelectorAll('#rides-list .ride-card');
+      document.getElementById('ride-count').textContent =
+        cards.length ? `${cards.length} נסיעות` : '0 נסיעות';
+    }
+
+    /* ── Join ride ─────────────────────────────── */
+    async function joinRide(btn, rideId) {
+      btn.disabled    = true;
+      btn.textContent = 'שולח...';
+      try {
+        const res = await fetch(`/api/rides/${rideId}/join`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ passenger_name: username })
+        });
+        if (!res.ok) throw new Error();
+        btn.outerHTML = `<span class="btn-pending-state">⏳ ממתין</span>`;
+        const banner = document.getElementById('requests-banner');
+        banner.style.display = 'block';
+      } catch {
+        btn.disabled    = false;
+        btn.textContent = 'הצטרף ←';
+      }
+    }
+
     function escHtml(str) {
       return String(str)
         .replace(/&/g,'&amp;').replace(/</g,'&lt;')
         .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
+
+    /* ── Init ──────────────────────────────────── */
+    loadEvents();
+    loadRides();
+
+    /* ── Driver profile modal ─────────────────── */
+    /* ── Driver profile modal ─────────────────── */
+    function showDriverProfile(name, age, photo, city, grad) {
+      const modal = document.getElementById('driver-modal');
+      const initials = (name || '?').split(' ').map(p=>p[0]?.toUpperCase()||'').slice(0,2).join('');
+
+      document.getElementById('dm-photo').innerHTML = photo
+        ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" referrerpolicy="no-referrer" />`
+        : `<span style="font-size:2rem;font-weight:800;color:#fff;">${initials}</span>`;
+      document.getElementById('dm-photo').style.background = photo ? 'transparent' : grad;
+
+      document.getElementById('dm-name').textContent = name || '—';
+      document.getElementById('dm-age').textContent  = age ? `גיל ${age}` : '';
+      const cityEl = document.getElementById('dm-city');
+      cityEl.textContent = city || '';
+      cityEl.style.display = city ? 'inline-flex' : 'none';
+
+      modal.style.display = 'flex';
+      requestAnimationFrame(() => modal.querySelector('.dm-card').style.transform = 'translateY(0)');
+    }
+
+    /* close on backdrop handled by onclick in HTML */
+    function closeDriverModal() {
+      const modal = document.getElementById('driver-modal');
+      modal.querySelector('.dm-card').style.transform = 'translateY(30px)';
+      setTimeout(() => modal.style.display = 'none', 200);
+    }
+
+    /* ── Edit ride modal ──────────────────────── */
+    let _editRideId = null;
+    function openEditRide(id) {
+      const ride = ridesStore[id];
+      if (!ride) return;
+      _editRideId = id;
+
+      document.getElementById('edit-city').value    = ride.city || '';
+      document.getElementById('edit-pickup').value  = ride.pickup_point || '';
+      document.getElementById('edit-time').value    = ride.departure_time || '';
+      document.getElementById('edit-seats').value   = ride.seats_available || 2;
+      document.getElementById('edit-vehicle').value = ride.vehicle_type || '';
+
+      const modal = document.getElementById('edit-modal');
+      modal.style.display = 'flex';
+      requestAnimationFrame(() => modal.querySelector('.dm-card').style.transform = 'translateY(0)');
+    }
+
+    /* close on backdrop handled by onclick in HTML */
+    function closeEditModal() {
+      const modal = document.getElementById('edit-modal');
+      modal.querySelector('.dm-card').style.transform = 'translateY(30px)';
+      setTimeout(() => modal.style.display = 'none', 200);
+    }
+
+    async function saveEditRide() {
+      const btn = document.getElementById('edit-save-btn');
+      btn.disabled = true; btn.textContent = 'שומר...';
+      try {
+        const res = await fetch(`/api/rides/${_editRideId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            city:           document.getElementById('edit-city').value,
+            pickup_point:   document.getElementById('edit-pickup').value,
+            departure_time: document.getElementById('edit-time').value,
+            seats_available:parseInt(document.getElementById('edit-seats').value),
+            vehicle_type:   document.getElementById('edit-vehicle').value || null,
+          })
+        });
+        if (!res.ok) throw new Error();
+        closeEditModal();
+        loadRides();
+      } catch {
+        btn.disabled = false; btn.textContent = 'שמור';
+      }
+    }
   </script>
+
+  <!-- Driver profile modal -->
+  <div id="driver-modal" onclick="if(event.target===this)closeDriverModal()" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:1rem;">
+    <div class="dm-card" style="position:relative;background:rgba(15,12,35,.97);border:1px solid rgba(124,58,237,.3);border-radius:1.5rem;padding:2rem;width:100%;max-width:300px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.5);transform:translateY(30px);transition:transform .25s cubic-bezier(.34,1.56,.64,1);">
+      <button onclick="closeDriverModal()" style="position:absolute;top:1rem;left:1rem;background:rgba(255,255,255,.06);border:none;border-radius:50%;width:32px;height:32px;color:#64748b;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s;" onmouseover="this.style.background='rgba(255,255,255,.12)'" onmouseout="this.style.background='rgba(255,255,255,.06)'">&times;</button>
+      <div id="dm-photo" style="width:88px;height:88px;border-radius:50%;margin:0 auto 1rem;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px rgba(124,58,237,.4),0 0 24px rgba(124,58,237,.25);overflow:hidden;"></div>
+      <h2 id="dm-name" style="font-size:1.2rem;font-weight:800;color:#f1f5f9;font-family:'Outfit',sans-serif;margin-bottom:.25rem;"></h2>
+      <p id="dm-age" style="font-size:.8rem;color:#64748b;margin-bottom:.6rem;"></p>
+      <span id="dm-city" style="display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:600;color:#67e8f9;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);border-radius:999px;padding:.25rem .8rem;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#67e8f9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      </span>
+    </div>
+  </div>
+
+  <!-- Edit ride modal -->
+  <div id="edit-modal" onclick="if(event.target===this)closeEditModal()" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);align-items:flex-end;justify-content:center;padding:0;" class="sm:items-center sm:p-4">
+    <div class="dm-card" style="position:relative;background:rgba(15,12,35,.97);border:1px solid rgba(124,58,237,.3);border-radius:1.5rem 1.5rem 0 0;padding:1.75rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,.4);transform:translateY(30px);transition:transform .25s cubic-bezier(.34,1.56,.64,1);">
+      <button onclick="closeEditModal()" style="position:absolute;top:1rem;left:1rem;background:rgba(255,255,255,.06);border:none;border-radius:50%;width:32px;height:32px;color:#64748b;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.background='rgba(255,255,255,.12)'" onmouseout="this.style.background='rgba(255,255,255,.06)'">&times;</button>
+      <h3 style="font-size:1rem;font-weight:800;color:#f1f5f9;font-family:'Outfit',sans-serif;margin-bottom:1.25rem;">ערוך נסיעה</h3>
+      <div style="display:flex;flex-direction:column;gap:.75rem;">
+        <div>
+          <label style="display:block;font-size:.72rem;color:#64748b;margin-bottom:.3rem;">עיר יציאה</label>
+          <input id="edit-city" class="field" type="text" />
+        </div>
+        <div>
+          <label style="display:block;font-size:.72rem;color:#64748b;margin-bottom:.3rem;">נקודת איסוף</label>
+          <input id="edit-pickup" class="field" type="text" />
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.75rem;">
+          <div>
+            <label style="display:block;font-size:.72rem;color:#64748b;margin-bottom:.3rem;">שעת יציאה</label>
+            <input id="edit-time" class="field" type="time" />
+          </div>
+          <div>
+            <label style="display:block;font-size:.72rem;color:#64748b;margin-bottom:.3rem;">מקומות</label>
+            <select id="edit-seats" class="field">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label style="display:block;font-size:.72rem;color:#64748b;margin-bottom:.3rem;">סוג רכב</label>
+          <input id="edit-vehicle" class="field" type="text" list="vehicle-suggestions" autocomplete="off" />
+        </div>
+        <button id="edit-save-btn" onclick="saveEditRide()" class="btn-submit" style="margin-top:.25rem;">שמור שינויים</button>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>

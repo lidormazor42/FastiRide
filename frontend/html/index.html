@@ -1,488 +1,775 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="he" dir="rtl" class="h-full">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FastiRide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: radial-gradient(ellipse at 30% 20%, #1a0533 0%, #0a0a14 55%, #00060f 100%); }
+    :root {
+      --bg:      #0b0b1a;
+      --violet:  #7c3aed;
+      --cyan:    #22d3ee;
+      --rose:    #f43f5e;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+    }
 
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Heebo', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 55% 45% at 10%  0%,   rgba(124,58,237,.38) 0%, transparent 65%),
+        radial-gradient(ellipse 45% 40% at 90%  85%,  rgba(34,211,238,.22) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 80%  10%,  rgba(99,102,241,.18) 0%, transparent 60%),
+        radial-gradient(ellipse 35% 30% at 50%  50%,  rgba(124,58,237,.1)  0%, transparent 70%);
+    }
+
+    /* ── Animations ─────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(22px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    @keyframes shimmerText {
+      0%   { background-position:-200% center; }
+      100% { background-position: 200% center; }
+    }
+    @keyframes dotPulse {
+      0%,100% { opacity:1; }
+      50%     { opacity:.3; }
+    }
+    @keyframes pulseRing {
+      0%  { box-shadow:0 0 0 0   rgba(124,58,237,.5); }
+      70% { box-shadow:0 0 0 10px rgba(124,58,237,0); }
+      100%{ box-shadow:0 0 0 0   rgba(124,58,237,0); }
+    }
+
+    .fade-up   { animation:fadeUp .65s ease-out both; }
+    .delay-1   { animation-delay:.1s; }
+    .delay-2   { animation-delay:.22s; }
+    .delay-3   { animation-delay:.36s; }
+    .delay-4   { animation-delay:.5s; }
+
+    /* ── Logo gradient ──────────────────────────── */
+    .logo-text {
+      background: linear-gradient(120deg, #c4b5fd 0%, #818cf8 30%, #22d3ee 65%, #c4b5fd 100%);
+      background-size: 200% auto;
+      -webkit-background-clip:text; background-clip:text;
+      -webkit-text-fill-color:transparent;
+      animation:shimmerText 4.5s linear infinite;
+    }
+
+    /* ── Glass surface ──────────────────────────── */
+    .glass-surface {
+      background: rgba(255,255,255,.025);
+      backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px);
+      border:1px solid rgba(255,255,255,.07);
+    }
+
+    /* ── Role card ──────────────────────────────── */
+    .role-card {
+      background: linear-gradient(145deg, rgba(20,18,48,.92) 0%, rgba(10,10,28,.97) 100%);
+      border:1px solid rgba(124,58,237,.28);
+      border-radius:1.75rem;
+      padding:2rem;
+      cursor:pointer;
+      text-align:right;
+      transition:transform .28s cubic-bezier(.34,1.56,.64,1), box-shadow .28s ease, border-color .28s ease;
+      position:relative; overflow:hidden;
+    }
+    .role-card::before {
+      content:''; position:absolute; inset:0; pointer-events:none;
+      background:radial-gradient(ellipse 90% 80% at 0% 0%, rgba(124,58,237,.12) 0%, transparent 60%);
+      transition: opacity .3s;
+    }
+    .role-card:hover::before { opacity: 1.5; }
     .role-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 0 40px rgba(168, 85, 247, 0.18);
-      border-color: rgba(168, 85, 247, 0.5);
+      transform:translateY(-8px) scale(1.02);
+      box-shadow:0 32px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(124,58,237,.4), inset 0 1px 0 rgba(255,255,255,.08);
     }
+    .role-card.role-attendee:hover { border-color:rgba(124,58,237,.7); box-shadow:0 28px 70px rgba(0,0,0,.45), 0 0 40px rgba(124,58,237,.25); }
+    .role-card.role-organizer:hover { border-color:rgba(34,211,238,.6); box-shadow:0 28px 70px rgba(0,0,0,.45), 0 0 40px rgba(34,211,238,.2); }
+    .role-card .card-glow-strip {
+      position:absolute; top:0; right:0; left:0; height:2px;
+      background:linear-gradient(90deg,transparent,rgba(124,58,237,.8),rgba(34,211,238,.6),transparent);
+    }
+    .role-card.role-organizer .card-glow-strip {
+      background:linear-gradient(90deg,transparent,rgba(34,211,238,.8),rgba(124,58,237,.5),transparent);
+    }
+    .role-card .icon-wrap {
+      width:56px; height:56px; border-radius:16px;
+      background:rgba(124,58,237,.15);
+      border:1px solid rgba(124,58,237,.35);
+      display:flex; align-items:center; justify-content:center;
+      margin-bottom:1.5rem;
+      transition:transform .3s cubic-bezier(.34,1.56,.64,1), box-shadow .3s;
+    }
+    .role-card.role-organizer .icon-wrap {
+      background:rgba(34,211,238,.1);
+      border-color:rgba(34,211,238,.3);
+    }
+    .role-card:hover .icon-wrap {
+      transform:scale(1.15) rotate(-6deg);
+      box-shadow:0 0 28px rgba(124,58,237,.5);
+    }
+    .role-card.role-organizer:hover .icon-wrap { box-shadow:0 0 28px rgba(34,211,238,.4); }
+
+    /* ── Panel (forms) ──────────────────────────── */
+    .form-panel {
+      background:linear-gradient(145deg,rgba(17,17,40,.9) 0%, rgba(13,13,30,.95) 100%);
+      border:1px solid rgba(124,58,237,.18);
+      border-radius:1.25rem;
+      backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+    }
+
+    /* ── Inputs ─────────────────────────────────── */
+    .field {
+      background:rgba(0,0,0,.4);
+      border:1px solid rgba(255,255,255,.08);
+      color:var(--text);
+      border-radius:.75rem;
+      padding:.6rem 1rem;
+      font-size:.875rem;
+      font-family:inherit;
+      width:100%;
+      transition:border-color .2s, box-shadow .2s;
+    }
+    .field::placeholder { color:#475569; }
+    .field:focus { outline:none; border-color:rgba(124,58,237,.7); box-shadow:0 0 0 3px rgba(124,58,237,.12); }
+    select.field { cursor:pointer; appearance:none; }
+    input[type="date"].field::-webkit-calendar-picker-indicator { filter:invert(.5); cursor:pointer; }
+
+    /* ── Event cards picker ─────────────────────── */
+    .event-card {
+      display:flex; align-items:center; gap:.875rem;
+      background:linear-gradient(145deg,rgba(20,18,45,.85) 0%, rgba(13,13,30,.92) 100%);
+      border:1px solid rgba(124,58,237,.18);
+      border-radius:.9rem;
+      padding:.8rem 1rem;
+      cursor:pointer;
+      transition:border-color .2s, box-shadow .2s, background .2s;
+      animation:fadeUp .5s ease-out both;
+    }
+    .event-card:hover {
+      border-color:rgba(124,58,237,.45);
+      box-shadow:0 0 16px rgba(124,58,237,.18);
+    }
+    .event-card.selected {
+      border-color:#7c3aed;
+      background:linear-gradient(145deg,rgba(124,58,237,.14) 0%, rgba(13,13,30,.95) 100%);
+      box-shadow:0 0 20px rgba(124,58,237,.35);
+    }
+    .event-bolt {
+      width:40px; height:40px; border-radius:11px; flex-shrink:0;
+      background:rgba(124,58,237,.12);
+      border:1px solid rgba(124,58,237,.25);
+      display:flex; align-items:center; justify-content:center;
+      transition:box-shadow .2s, background .2s;
+    }
+    .event-card.selected .event-bolt {
+      background:rgba(124,58,237,.25);
+      box-shadow:0 0 14px rgba(124,58,237,.4);
+    }
+    .event-card .check-badge {
+      width:22px; height:22px; border-radius:50%; flex-shrink:0;
+      background:rgba(34,211,238,.15);
+      border:1px solid rgba(34,211,238,.5);
+      display:flex; align-items:center; justify-content:center;
+      opacity:0; transform:scale(.5);
+      transition:opacity .2s, transform .2s;
+    }
+    .event-card.selected .check-badge { opacity:1; transform:scale(1); }
+    .event-skeleton {
+      height:64px; border-radius:.9rem;
+      background:linear-gradient(90deg,rgba(124,58,237,.06) 25%,rgba(124,58,237,.14) 50%,rgba(124,58,237,.06) 75%);
+      background-size:200% 100%;
+      animation:skeletonShimmer 1.4s ease-in-out infinite;
+    }
+    @keyframes skeletonShimmer {
+      0%   { background-position:200% 0; }
+      100% { background-position:-200% 0; }
+    }
+
+    /* ── Primary button ─────────────────────────── */
     .btn-primary {
-      background: linear-gradient(135deg, #7c3aed, #a855f7);
-      transition: all 0.2s;
+      width:100%; border:none; cursor:pointer;
+      font-family:inherit; font-weight:700; font-size:.875rem; letter-spacing:.02em;
+      padding:.9rem; border-radius:.875rem;
+      background:linear-gradient(135deg,#7c3aed 0%,#06b6d4 100%);
+      color:#fff;
+      transition:opacity .2s, transform .2s, box-shadow .3s;
+      position:relative; overflow:hidden;
     }
-    .btn-primary:hover {
-      box-shadow: 0 0 28px rgba(168, 85, 247, 0.5);
-      transform: translateY(-1px);
+    .btn-primary::after {
+      content:''; position:absolute; inset:0; pointer-events:none;
+      background:linear-gradient(135deg,rgba(255,255,255,.15) 0%,transparent 55%);
     }
-    .btn-primary:disabled { opacity: 0.6; transform: none; box-shadow: none; cursor: not-allowed; }
+    .btn-primary:hover:not(:disabled) {
+      opacity:.9; transform:translateY(-1px);
+      box-shadow:0 0 30px rgba(124,58,237,.5), 0 0 60px rgba(34,211,238,.15);
+    }
+    .btn-primary:disabled { opacity:.45; cursor:not-allowed; transform:none; box-shadow:none; }
 
-    .btn-instagram {
-      background: linear-gradient(135deg, #833ab4, #c13584, #e1306c, #fd1d1d);
-      transition: all 0.2s;
+    /* ── Google button ──────────────────────────── */
+    .btn-google {
+      display:flex; align-items:center; justify-content:center; gap:.75rem;
+      width:100%; border:none; cursor:pointer;
+      font-family:inherit; font-weight:600; font-size:.875rem;
+      padding:.875rem; border-radius:.875rem;
+      background:#fff; color:#111827;
+      transition:transform .2s, box-shadow .2s;
+      text-decoration:none;
     }
-    .btn-instagram:hover { box-shadow: 0 0 28px rgba(225, 48, 108, 0.45); transform: translateY(-1px); }
-    .btn-instagram:disabled { opacity: 0.6; transform: none; cursor: not-allowed; }
+    .btn-google:hover {
+      transform:translateY(-1px);
+      box-shadow:0 8px 28px rgba(0,0,0,.35);
+    }
 
-    input[type="text"], input[type="email"], input[type="date"], select { background: #09090f; }
-    input:focus, select:focus {
-      box-shadow: 0 0 0 1px #a855f7, 0 0 14px rgba(168, 85, 247, 0.15);
+    /* ── Step indicators ────────────────────────── */
+    .step-active {
+      width:26px; height:26px; border-radius:50%;
+      background:linear-gradient(135deg,#7c3aed,#22d3ee);
+      display:flex; align-items:center; justify-content:center;
+      color:#fff; font-size:.72rem; font-weight:700;
+      animation:pulseRing 2.2s infinite;
+      flex-shrink:0;
+    }
+    .step-done {
+      width:26px; height:26px; border-radius:50%;
+      background:linear-gradient(135deg,#059669,#22c55e);
+      display:flex; align-items:center; justify-content:center;
+      color:#fff; font-size:.7rem; font-weight:700; flex-shrink:0;
+    }
+    .step-idle {
+      width:26px; height:26px; border-radius:50%;
+      background:#1e293b; border:1px solid #334155;
+      display:flex; align-items:center; justify-content:center;
+      color:#475569; font-size:.72rem; font-weight:700; flex-shrink:0;
+    }
+
+    /* ── Section header ─────────────────────────── */
+    .section-label {
+      font-size:.78rem; font-weight:700; color:#94a3b8; margin-bottom:1rem;
     }
   </style>
 </head>
-<body class="min-h-screen flex items-start justify-center px-4 py-12">
+<body style="display:flex;align-items:flex-start;justify-content:center;padding:3.5rem 1rem 5rem;position:relative;overflow-x:hidden;">
 
-  <!-- ambient blobs -->
-  <div class="fixed top-0 left-1/4 w-96 h-96 bg-purple-900/20 rounded-full blur-3xl pointer-events-none"></div>
-  <div class="fixed bottom-10 right-1/4 w-80 h-80 bg-violet-900/10 rounded-full blur-3xl pointer-events-none"></div>
+  <div style="position:relative;width:100%;max-width:640px;z-index:1;">
 
-  <div class="relative w-full max-w-2xl">
-
-
-    <!-- ════════════════════════════════════════════════════════════
-         STEP 1 — LANDING
-    ════════════════════════════════════════════════════════════ -->
+    <!-- ══════════════════════════════════════════
+         STEP 1 — Landing
+    ══════════════════════════════════════════ -->
     <div data-step="landing">
 
-      <div class="text-center mb-12">
-        <div class="inline-flex items-center gap-2 mb-3">
-          <span class="text-4xl">⚡</span>
-          <span class="text-5xl font-extrabold tracking-tight bg-gradient-to-r from-purple-400 via-violet-300 to-cyan-400 bg-clip-text text-transparent">
-            FastiRide
-          </span>
+      <!-- Hero -->
+      <div style="text-align:center;margin-bottom:3rem;" class="fade-up">
+        <div style="display:inline-flex;align-items:center;gap:.875rem;margin-bottom:1.25rem;">
+          <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,rgba(124,58,237,.25),rgba(34,211,238,.15));border:1px solid rgba(124,58,237,.45);display:flex;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(124,58,237,.35),0 0 60px rgba(124,58,237,.12);">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+              <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="url(#hero-lg)" stroke="url(#hero-lg)" stroke-width=".5" stroke-linejoin="round"/>
+              <defs><linearGradient id="hero-lg" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#c4b5fd"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+            </svg>
+          </div>
+          <span class="logo-text" style="font-size:3.2rem;font-weight:900;letter-spacing:-.04em;font-family:'Outfit',sans-serif;">FastiRide</span>
         </div>
-        <p class="text-zinc-400 text-base">Ride Sharing Platform</p>
-        <p class="text-zinc-600 text-sm mt-1">Who are you joining us as today?</p>
+        <p style="font-size:1rem;color:#94a3b8;font-weight:500;letter-spacing:-.01em;">פלטפורמת שיתוף נסיעות לאירועים ופסטיבלים</p>
+        <p style="font-size:.82rem;color:#4a5568;margin-top:.5rem;font-weight:500;">מי אתה היום?</p>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <!-- Role cards -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;" class="fade-up delay-2">
 
-        <button onclick="show('user-login')"
-          class="role-card bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-8 text-left cursor-pointer transition-all duration-200 group">
-          <div class="text-4xl mb-4">🎪</div>
-          <h2 class="text-white font-bold text-xl mb-2">I am a User</h2>
-          <p class="text-zinc-500 text-sm leading-relaxed">Upload your festival ticket and find or create shared rides to the event.</p>
-          <div class="mt-6 inline-flex items-center gap-1 text-purple-400 text-sm font-medium">
-            Get started <span class="group-hover:translate-x-1 transition-transform inline-block">&rarr;</span>
+        <!-- Attendee card -->
+        <button onclick="show('user-login')" class="role-card role-attendee" style="border:none;">
+          <div class="card-glow-strip"></div>
+          <div class="icon-wrap">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 11l19-9-9 19-2-8-8-2z"/>
+            </svg>
+          </div>
+          <h2 style="font-size:1.25rem;font-weight:800;color:#f1f5f9;margin-bottom:.5rem;font-family:'Outfit',sans-serif;letter-spacing:-.02em;">אני מגיע לאירוע</h2>
+          <p style="font-size:.84rem;color:#7c8db5;line-height:1.65;margin-bottom:1.75rem;">העלה כרטיס פסטיבל ומצא או פרסם נסיעה משותפת.</p>
+          <div style="display:inline-flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:700;color:#c4b5fd;background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.3);border-radius:999px;padding:.35rem .9rem;">
+            <span>התחל</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
           </div>
         </button>
 
-        <button onclick="show('organizer')"
-          class="role-card bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-8 text-left cursor-pointer transition-all duration-200 group">
-          <div class="text-4xl mb-4">🎛️</div>
-          <h2 class="text-white font-bold text-xl mb-2">I am an Organizer</h2>
-          <p class="text-zinc-500 text-sm leading-relaxed">Register your event, define ticket validation rules, and manage the ride board.</p>
-          <div class="mt-6 inline-flex items-center gap-1 text-purple-400 text-sm font-medium">
-            Set up event <span class="group-hover:translate-x-1 transition-transform inline-block">&rarr;</span>
+        <!-- Organizer card -->
+        <button onclick="show('organizer')" class="role-card role-organizer" style="border:none;">
+          <div class="card-glow-strip"></div>
+          <div class="icon-wrap">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#67e8f9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+            </svg>
+          </div>
+          <h2 style="font-size:1.25rem;font-weight:800;color:#f1f5f9;margin-bottom:.5rem;font-family:'Outfit',sans-serif;letter-spacing:-.02em;">אני מארגן</h2>
+          <p style="font-size:.84rem;color:#7c8db5;line-height:1.65;margin-bottom:1.75rem;">רשום את האירוע שלך, אמת כרטיסים ונהל את קבוצת הטרמפים.</p>
+          <div style="display:inline-flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:700;color:#67e8f9;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.28);border-radius:999px;padding:.35rem .9rem;">
+            <span>הגדר אירוע</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
           </div>
         </button>
 
+      </div>
+
+      <!-- Live badge -->
+      <div style="display:flex;justify-content:center;margin-top:2rem;" class="fade-up delay-4">
+        <div class="glass-surface" style="display:inline-flex;align-items:center;gap:.5rem;border-radius:999px;padding:.45rem 1.1rem;">
+          <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0;animation:dotPulse 2s infinite;"></span>
+          <span style="font-size:.75rem;color:#64748b;font-weight:500;">פלטפורמה פעילה · אירועים קרובים זמינים</span>
+        </div>
       </div>
     </div>
 
 
-    <!-- ════════════════════════════════════════════════════════════
-         STEP 2 — ORGANIZER REGISTRATION
-    ════════════════════════════════════════════════════════════ -->
-    <div data-step="organizer" class="hidden">
-
-      <button onclick="show('landing')" class="flex items-center gap-1.5 text-zinc-500 hover:text-purple-400 text-sm mb-8 transition-colors">
-        &larr; Back
+    <!-- ══════════════════════════════════════════
+         STEP 2 — Organizer registration
+    ══════════════════════════════════════════ -->
+    <div data-step="organizer" style="display:none;">
+      <button onclick="show('landing')"
+        style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#475569;background:none;border:none;cursor:pointer;font-family:inherit;margin-bottom:2rem;padding:0;transition:color .2s;"
+        onmouseover="this.style.color='#a78bfa'" onmouseout="this.style.color='#475569'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        חזרה
       </button>
 
-      <div class="mb-8">
-        <h1 class="text-white font-bold text-2xl">Create your Event</h1>
-        <p class="text-zinc-500 text-sm mt-1">Fill in your details and define the festival configuration.</p>
+      <div style="margin-bottom:1.75rem;">
+        <h1 style="font-size:1.5rem;font-weight:800;color:#f1f5f9;letter-spacing:-.02em;">צור אירוע</h1>
+        <p style="font-size:.83rem;color:#64748b;margin-top:.3rem;">מלא את הפרטים ופתח את קבוצת הטרמפים לאירוע שלך.</p>
       </div>
 
-      <form onsubmit="submitOrganizer(event)" class="space-y-5">
+      <form onsubmit="submitOrganizer(event)" style="display:flex;flex-direction:column;gap:.875rem;">
 
-        <!-- organizer details -->
-        <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-6">
-          <h3 class="text-zinc-400 text-xs font-semibold uppercase tracking-widest mb-4">Organizer Details</h3>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="form-panel" style="padding:1.5rem;">
+          <p style="font-size:.78rem;font-weight:700;color:#94a3b8;margin-bottom:1rem;">פרטי מארגן</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.875rem;">
             <div>
-              <label class="block text-xs text-zinc-500 mb-1.5">Full Name</label>
-              <input type="text" placeholder="Alex Johnson" required
-                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+              <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">שם מלא</label>
+              <input id="org-fullname" type="text" placeholder="ישראל ישראלי" required class="field" />
             </div>
             <div>
-              <label class="block text-xs text-zinc-500 mb-1.5">Organization</label>
-              <input type="text" placeholder="Ozora Productions" required
-                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+              <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">גיל</label>
+              <input id="org-age" type="number" min="18" max="99" placeholder="25" required class="field" />
             </div>
-            <div class="sm:col-span-2">
-              <label class="block text-xs text-zinc-500 mb-1.5">Email</label>
-              <input type="email" placeholder="organizer@ozora.hu" required
-                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+            <div>
+              <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">תעודת זהות</label>
+              <input id="org-id" type="text" inputmode="numeric" maxlength="9" placeholder="123456789" required class="field" />
+            </div>
+            <div>
+              <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">ארגון</label>
+              <input id="org-company" type="text" placeholder="Psytech Productions" required class="field" />
+            </div>
+            <div style="grid-column:1/-1;">
+              <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">אימייל</label>
+              <input id="org-email" type="email" placeholder="organizer@psytech.co.il" required class="field" />
             </div>
           </div>
         </div>
 
-        <!-- festival metadata -->
-        <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-6">
-          <h3 class="text-zinc-400 text-xs font-semibold uppercase tracking-widest mb-4">Festival Metadata</h3>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="form-panel" style="padding:1.5rem;">
+          <p style="font-size:.78rem;font-weight:700;color:#94a3b8;margin-bottom:1rem;">פרטי האירוע</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.875rem;">
             <div>
-              <label class="block text-xs text-zinc-500 mb-1.5">Event Name</label>
-              <input id="org-event-name" type="text" placeholder="Ozora Festival 2025" required
-                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+              <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">שם האירוע</label>
+              <input id="org-event-name" type="text" placeholder="Psytech 2025" required class="field" />
             </div>
             <div>
-              <label class="block text-xs text-zinc-500 mb-1.5">Event Date</label>
-              <input type="date" required
-                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors" />
+              <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">תאריך</label>
+              <input id="org-event-date" type="date" required class="field" />
             </div>
             <div>
-              <label class="block text-xs text-zinc-500 mb-1.5">Location</label>
-              <input type="text" placeholder="Ozora, Hungary" required
-                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+              <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">מיקום</label>
+              <input id="org-event-location" type="text" placeholder="הנגב, ישראל" required class="field" />
             </div>
-            <div>
-              <label class="block text-xs text-zinc-500 mb-1.5">Ticket Prefix</label>
-              <input id="org-prefix" type="text" placeholder="OZORA-" required
-                class="w-full border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm font-mono placeholder-zinc-600 focus:outline-none focus:border-purple-500 transition-colors" />
+            <div style="grid-column:1/-1;">
+              <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">לוגו האירוע</label>
+              <label id="org-logo-label" style="display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;background:rgba(124,58,237,.06);border:1.5px dashed rgba(124,58,237,.3);border-radius:.75rem;cursor:pointer;transition:border-color .2s,background .2s;" onmouseover="this.style.borderColor='rgba(124,58,237,.6)';this.style.background='rgba(124,58,237,.1)'" onmouseout="this.style.borderColor='rgba(124,58,237,.3)';this.style.background='rgba(124,58,237,.06)'">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span id="org-logo-name" style="font-size:.8rem;color:#64748b;">העלה לוגו (PNG / JPG)</span>
+                <input id="org-logo" type="file" accept="image/*" style="display:none;" onchange="const f=this.files[0];if(f)document.getElementById('org-logo-name').textContent=f.name;" />
+              </label>
             </div>
           </div>
         </div>
 
-        <!-- API permissions -->
-        <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-6">
-          <div class="flex items-center gap-2 mb-1">
-            <h3 class="text-zinc-400 text-xs font-semibold uppercase tracking-widest">API Permissions</h3>
-            <span class="text-xs bg-purple-950 text-purple-400 border border-purple-800/60 rounded-full px-2 py-0.5">Integration</span>
-          </div>
-          <p class="text-zinc-600 text-xs mb-4">Grant FastiRide API access to validate tickets on behalf of your event.</p>
+        <div id="org-error" style="display:none;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.3);border-radius:.75rem;padding:.75rem 1rem;font-size:.82rem;color:#fb7185;"></div>
 
-          <div class="space-y-3">
-            <label class="flex items-start gap-3 border border-zinc-700/50 rounded-xl p-3.5 cursor-pointer hover:border-purple-700/40 transition-colors">
-              <input type="checkbox" checked class="mt-0.5 w-4 h-4 accent-purple-500 shrink-0" />
-              <div>
-                <p class="text-white text-sm font-medium font-mono">tickets:validate</p>
-                <p class="text-zinc-500 text-xs mt-0.5">Allow the platform to verify ticket codes against your event rules</p>
-              </div>
-            </label>
-            <label class="flex items-start gap-3 border border-zinc-700/50 rounded-xl p-3.5 cursor-pointer hover:border-purple-700/40 transition-colors">
-              <input type="checkbox" checked class="mt-0.5 w-4 h-4 accent-purple-500 shrink-0" />
-              <div>
-                <p class="text-white text-sm font-medium font-mono">rides:read</p>
-                <p class="text-zinc-500 text-xs mt-0.5">View all ride activity associated with your event</p>
-              </div>
-            </label>
-            <label class="flex items-start gap-3 border border-zinc-700/50 rounded-xl p-3.5 cursor-pointer hover:border-purple-700/40 transition-colors">
-              <input type="checkbox" class="mt-0.5 w-4 h-4 accent-purple-500 shrink-0" />
-              <div>
-                <p class="text-white text-sm font-medium font-mono">rides:moderate</p>
-                <p class="text-zinc-500 text-xs mt-0.5">Approve or reject ride requests on behalf of drivers</p>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <button type="submit" class="btn-primary w-full text-white font-semibold py-3.5 rounded-xl text-sm tracking-wide">
-          Create Event &amp; Generate API Key &rarr;
-        </button>
+        <button type="submit" id="org-submit-btn" class="btn-primary">צור אירוע ←</button>
 
       </form>
     </div>
 
 
-    <!-- ════════════════════════════════════════════════════════════
-         STEP 3 — ORGANIZER DASHBOARD
-    ════════════════════════════════════════════════════════════ -->
-    <div data-step="org-dashboard" class="hidden">
+    <!-- ══════════════════════════════════════════
+         STEP 3 — Organizer dashboard
+    ══════════════════════════════════════════ -->
+    <div data-step="org-dashboard" style="display:none;">
 
-      <div class="text-center mb-8">
-        <div class="inline-flex items-center justify-center w-16 h-16 bg-emerald-950 border border-emerald-700/60 rounded-full mb-4 text-3xl">✓</div>
-        <h1 class="text-white font-bold text-2xl">Event Created!</h1>
-        <p class="text-zinc-500 text-sm mt-1">Your festival is live on FastiRide.</p>
+      <div style="text-align:center;margin-bottom:2rem;">
+        <div style="width:64px;height:64px;border-radius:50%;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;box-shadow:0 0 24px rgba(34,197,94,.2);">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <h1 style="font-size:1.5rem;font-weight:800;color:#f1f5f9;">האירוע נוצר!</h1>
+        <p style="font-size:.83rem;color:#64748b;margin-top:.3rem;">הפסטיבל שלך פעיל ב-FastiRide.</p>
       </div>
 
-      <div class="space-y-4">
+      <div style="display:flex;flex-direction:column;gap:.875rem;">
 
-        <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-6">
-          <h3 class="text-zinc-400 text-xs font-semibold uppercase tracking-widest mb-4">Event Summary</h3>
-          <div class="grid grid-cols-2 gap-y-4 gap-x-6">
-            <div>
-              <p class="text-zinc-600 text-xs">Event Name</p>
-              <p id="dash-event-name" class="text-white font-medium text-sm mt-0.5">—</p>
+        <div class="form-panel" style="padding:1.5rem;">
+          <p style="font-size:.78rem;font-weight:700;color:#94a3b8;margin-bottom:1rem;">סיכום אירוע</p>
+          <div style="display:flex;gap:1.25rem;align-items:flex-start;">
+            <div id="dash-logo-wrap" style="display:none;flex-shrink:0;">
+              <img id="dash-logo-img" src="" alt="לוגו" style="width:60px;height:60px;border-radius:.75rem;object-fit:cover;border:1px solid rgba(124,58,237,.3);" />
             </div>
-            <div>
-              <p class="text-zinc-600 text-xs">Ticket Prefix</p>
-              <p id="dash-prefix" class="text-purple-400 font-mono text-sm mt-0.5">—</p>
-            </div>
-            <div class="col-span-2">
-              <!-- label + tooltip -->
-              <div class="flex items-center gap-1.5 mb-1.5">
-                <p class="text-zinc-600 text-xs">Event Connection Code</p>
-                <div class="relative group">
-                  <span class="w-4 h-4 rounded-full bg-zinc-700 text-zinc-400 text-xs font-bold flex items-center justify-center cursor-default select-none">?</span>
-                  <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-zinc-800 border border-zinc-600 rounded-xl px-3 py-2.5 text-xs text-zinc-300 leading-relaxed opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-10 shadow-xl">
-                    This code allows FastiRide to verify tickets for your event. Keep it safe — treat it like a password.
-                    <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-zinc-600"></div>
-                  </div>
-                </div>
+            <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1.5rem;">
+              <div>
+                <p style="font-size:.72rem;color:#475569;margin-bottom:.2rem;">שם האירוע</p>
+                <p id="dash-event-name" style="font-size:.9rem;font-weight:700;color:#f1f5f9;font-family:'Outfit',sans-serif;">—</p>
               </div>
-              <!-- code field: hidden by default -->
-              <div class="flex items-center gap-2 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2.5">
-                <code id="dash-api-key" data-value="" class="text-emerald-400 font-mono text-xs flex-1 truncate tracking-widest">••••••••••••••••••••</code>
-                <button onclick="toggleKey(this)" class="text-zinc-500 hover:text-zinc-200 text-xs transition-colors shrink-0 border-r border-zinc-700 pr-2 mr-0">Show</button>
-                <button id="copy-btn" onclick="copyKey()" class="text-zinc-500 hover:text-zinc-200 text-xs transition-colors shrink-0">Copy</button>
+              <div>
+                <p style="font-size:.72rem;color:#475569;margin-bottom:.2rem;">תאריך</p>
+                <p id="dash-event-date" style="font-size:.9rem;font-weight:600;color:#c4b5fd;">—</p>
+              </div>
+              <div style="grid-column:1/-1;">
+                <p style="font-size:.72rem;color:#475569;margin-bottom:.2rem;">מיקום</p>
+                <p id="dash-event-location" style="font-size:.9rem;font-weight:600;color:#67e8f9;">—</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div class="grid grid-cols-3 gap-3">
-          <div class="bg-zinc-900/60 border border-zinc-700/40 rounded-xl p-4 text-center">
-            <p class="text-2xl font-bold text-purple-400">0</p>
-            <p class="text-zinc-600 text-xs mt-1">Rides</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;">
+          <div class="form-panel" style="padding:1rem;text-align:center;">
+            <p style="font-size:1.6rem;font-weight:800;color:#a78bfa;">0</p>
+            <p style="font-size:.72rem;color:#475569;margin-top:.2rem;">נסיעות</p>
           </div>
-          <div class="bg-zinc-900/60 border border-zinc-700/40 rounded-xl p-4 text-center">
-            <p class="text-2xl font-bold text-cyan-400">0</p>
-            <p class="text-zinc-600 text-xs mt-1">Attendees</p>
+          <div class="form-panel" style="padding:1rem;text-align:center;">
+            <p style="font-size:1.6rem;font-weight:800;color:#67e8f9;">0</p>
+            <p style="font-size:.72rem;color:#475569;margin-top:.2rem;">משתתפים</p>
           </div>
-          <div class="bg-zinc-900/60 border border-zinc-700/40 rounded-xl p-4 text-center">
-            <p class="text-2xl font-bold text-emerald-400">&#10003;</p>
-            <p class="text-zinc-600 text-xs mt-1">Live</p>
+          <div class="form-panel" style="padding:1rem;text-align:center;">
+            <div style="display:flex;align-items:center;justify-content:center;gap:.3rem;">
+              <span style="width:8px;height:8px;border-radius:50%;background:#4ade80;animation:dotPulse 2s infinite;"></span>
+              <p style="font-size:.85rem;font-weight:700;color:#4ade80;">פעיל</p>
+            </div>
           </div>
         </div>
 
-        <a href="/board"
-          class="btn-primary block w-full text-white font-semibold py-3.5 rounded-xl text-sm tracking-wide text-center">
-          Open Ride Board &rarr;
+        <a href="/board" class="btn-primary" style="display:block;text-align:center;text-decoration:none;">
+          פתח לוח נסיעות ←
+        </a>
+      </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════
+         STEP 4 — User login
+    ══════════════════════════════════════════ -->
+    <div data-step="user-login" style="display:none;">
+      <button onclick="show('landing')"
+        style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#475569;background:none;border:none;cursor:pointer;font-family:inherit;margin-bottom:2rem;padding:0;transition:color .2s;"
+        onmouseover="this.style.color='#a78bfa'" onmouseout="this.style.color='#475569'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        חזרה
+      </button>
+
+      <!-- Step tracker -->
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:2rem;">
+        <div class="step-active">1</div>
+        <span style="font-size:.8rem;font-weight:600;color:#e2e8f0;">חבר חשבון</span>
+        <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(124,58,237,.4),rgba(255,255,255,.05));"></div>
+        <span style="font-size:.8rem;color:#475569;">העלה כרטיס</span>
+        <div class="step-idle">2</div>
+      </div>
+
+      <div style="margin-bottom:2rem;">
+        <h1 style="font-size:1.5rem;font-weight:800;color:#f1f5f9;">חבר את החשבון שלך</h1>
+        <p style="font-size:.83rem;color:#64748b;margin-top:.3rem;">שלב 1 מתוך 2 — התחבר כדי שנוכל להציג את שמך ותמונתך על לוח הנסיעות.</p>
+      </div>
+
+      <div class="form-panel" style="padding:2rem;display:flex;flex-direction:column;gap:.875rem;">
+
+        <!-- Google -->
+        <a href="/api/auth/google" class="btn-google">
+          <svg width="20" height="20" viewBox="0 0 24 24" style="flex-shrink:0;">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          המשך עם Google
         </a>
 
       </div>
     </div>
 
 
-    <!-- ════════════════════════════════════════════════════════════
-         STEP 4 — USER: INSTAGRAM LOGIN
-    ════════════════════════════════════════════════════════════ -->
-    <div data-step="user-login" class="hidden">
-
-      <button onclick="show('landing')" class="flex items-center gap-1.5 text-zinc-500 hover:text-purple-400 text-sm mb-8 transition-colors">
-        &larr; Back
+    <!-- ══════════════════════════════════════════
+         STEP 5 — Ticket upload
+    ══════════════════════════════════════════ -->
+    <div data-step="user-upload" style="display:none;">
+      <button onclick="show('user-login')"
+        style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#475569;background:none;border:none;cursor:pointer;font-family:inherit;margin-bottom:2rem;padding:0;transition:color .2s;"
+        onmouseover="this.style.color='#a78bfa'" onmouseout="this.style.color='#475569'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        חזרה
       </button>
 
-      <!-- step progress -->
-      <div class="flex items-center gap-2 mb-8">
-        <div class="flex items-center gap-2">
-          <span class="w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center">1</span>
-          <span class="text-white text-xs font-medium">Connect Account</span>
-        </div>
-        <div class="flex-1 h-px bg-zinc-700"></div>
-        <div class="flex items-center gap-2">
-          <span class="w-6 h-6 rounded-full bg-zinc-700 text-zinc-500 text-xs font-bold flex items-center justify-center">2</span>
-          <span class="text-zinc-500 text-xs">Upload Ticket</span>
-        </div>
+      <!-- Step tracker -->
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:2rem;">
+        <div class="step-done">✓</div>
+        <span style="font-size:.8rem;color:#64748b;">חבר חשבון</span>
+        <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(124,58,237,.5),rgba(34,211,238,.3));"></div>
+        <span style="font-size:.8rem;font-weight:600;color:#e2e8f0;">העלה כרטיס</span>
+        <div class="step-active">2</div>
       </div>
 
-      <div class="mb-8">
-        <h1 class="text-white font-bold text-2xl">Connect your account</h1>
-        <p class="text-zinc-500 text-sm mt-1">Step 1 of 2 &mdash; We use Instagram to identify you on the ride board so other riders know who you are.</p>
+      <div style="margin-bottom:1.5rem;">
+        <h1 style="font-size:1.5rem;font-weight:800;color:#f1f5f9;">העלה את הכרטיס שלך</h1>
+        <p style="font-size:.83rem;color:#64748b;margin-top:.3rem;">שלב 2 מתוך 2 — העלה screenshot של הכרטיס ובחר את האירוע.</p>
       </div>
 
-      <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-8">
-        <button id="ig-btn" onclick="mockInstagramLogin(this)"
-          class="btn-instagram w-full text-white font-semibold py-3.5 rounded-xl text-sm tracking-wide flex items-center justify-center gap-2.5">
-          <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-          </svg>
-          Continue with Instagram
-        </button>
-        <p class="text-zinc-600 text-xs text-center mt-4">Simulated OAuth &mdash; no real credentials required.</p>
-      </div>
-
-    </div>
-
-
-    <!-- ════════════════════════════════════════════════════════════
-         STEP 5 — USER: UPLOAD TICKET + SELECT PARTY
-    ════════════════════════════════════════════════════════════ -->
-    <div data-step="user-upload" class="hidden">
-
-      <button onclick="show('user-login')" class="flex items-center gap-1.5 text-zinc-500 hover:text-purple-400 text-sm mb-8 transition-colors">
-        &larr; Back
-      </button>
-
-      <!-- step progress -->
-      <div class="flex items-center gap-2 mb-8">
-        <div class="flex items-center gap-2">
-          <span class="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">&#10003;</span>
-          <span class="text-zinc-400 text-xs">Connect Account</span>
-        </div>
-        <div class="flex-1 h-px bg-purple-700"></div>
-        <div class="flex items-center gap-2">
-          <span class="w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center">2</span>
-          <span class="text-white text-xs font-medium">Upload Ticket</span>
-        </div>
-      </div>
-
-      <div class="mb-6">
-        <h1 class="text-white font-bold text-2xl">Upload your ticket</h1>
-        <p class="text-zinc-500 text-sm mt-1">Step 2 of 2 &mdash; Upload your festival PDF and select the event to validate access.</p>
-      </div>
-
-      <!-- mock profile pill -->
-      <div class="flex items-center gap-3 bg-zinc-900/60 border border-zinc-700/40 rounded-2xl px-5 py-4 mb-6">
-        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm shrink-0">JD</div>
+      <!-- User pill -->
+      <div class="form-panel" style="padding:1rem 1.25rem;display:flex;align-items:center;gap:.875rem;margin-bottom:1.25rem;">
+        <div id="user-pill-avatar"
+          style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#22d3ee);display:flex;align-items:center;justify-content:center;color:#fff;font-size:.85rem;font-weight:700;flex-shrink:0;overflow:hidden;box-shadow:0 0 0 2px rgba(124,58,237,.3);">G</div>
         <div>
-          <p class="text-white text-sm font-medium">@john.doe.festival</p>
-          <p class="text-zinc-500 text-xs flex items-center gap-1.5 mt-0.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
-            Connected via Instagram
+          <p id="user-pill-name" style="font-size:.9rem;font-weight:600;color:#f1f5f9;">מחובר</p>
+          <p style="font-size:.72rem;color:#475569;display:flex;align-items:center;gap:.4rem;margin-top:.15rem;">
+            <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;animation:dotPulse 2s infinite;"></span>
+            מחובר דרך Google
           </p>
         </div>
       </div>
 
-      <div class="space-y-4">
+      <div style="display:flex;flex-direction:column;gap:.875rem;">
 
-        <!-- ticket upload -->
-        <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-6">
-          <h3 class="text-zinc-400 text-xs font-semibold uppercase tracking-widest mb-4">Upload Ticket</h3>
-          <label class="flex flex-col items-center justify-center border-2 border-dashed border-zinc-700 rounded-xl p-8 cursor-pointer hover:border-purple-600/50 transition-colors group">
-            <span class="text-3xl mb-3 group-hover:scale-110 transition-transform">📄</span>
-            <p class="text-zinc-400 text-sm font-medium">Click to upload your ticket PDF</p>
-            <p class="text-zinc-600 text-xs mt-1">PDF only &middot; max 10 MB</p>
-            <input id="ticket-file" type="file" accept=".pdf" class="hidden" onchange="onFileSelect(this)" />
+        <!-- Upload -->
+        <div class="form-panel" style="padding:1.5rem;">
+          <div class="section-label">העלאת כרטיס</div>
+          <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed rgba(124,58,237,.25);border-radius:.875rem;padding:2.5rem 1rem;cursor:pointer;transition:border-color .2s,background .2s;"
+            onmouseover="this.style.borderColor='rgba(34,211,238,.4)';this.style.background='rgba(124,58,237,.04)'"
+            onmouseout="this.style.borderColor='rgba(124,58,237,.25)';this.style.background=''">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="url(#up-lg)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:.875rem;">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+              <defs><linearGradient id="up-lg" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse"><stop stop-color="#a78bfa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+            </svg>
+            <p style="font-size:.875rem;font-weight:600;color:#94a3b8;">העלה screenshot של הכרטיס</p>
+            <p style="font-size:.75rem;color:#475569;margin-top:.25rem;">PNG / JPG / WEBP · עד 10 MB</p>
+            <input id="ticket-file" type="file" accept="image/*" style="display:none;" onchange="onFileSelect(this)" />
           </label>
-          <div id="file-preview" class="hidden mt-3 flex items-center gap-3 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3">
-            <span class="text-red-400 shrink-0">📕</span>
-            <span id="file-name" class="text-zinc-300 text-sm flex-1 truncate"></span>
-            <span class="text-emerald-400 text-xs font-medium shrink-0">Ready</span>
+          <div id="file-preview" style="display:none;margin-top:.75rem;display:none;align-items:center;gap:.75rem;background:rgba(0,0,0,.3);border:1px solid rgba(34,211,238,.2);border-radius:.75rem;padding:.7rem 1rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <span id="file-name" style="font-size:.82rem;color:#94a3b8;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+            <span style="font-size:.72rem;color:#4ade80;font-weight:600;flex-shrink:0;">מוכן</span>
           </div>
         </div>
 
-        <!-- party select -->
-        <div class="bg-zinc-900/80 border border-zinc-700/50 rounded-2xl p-6">
-          <h3 class="text-zinc-400 text-xs font-semibold uppercase tracking-widest mb-4">Select Party</h3>
-          <select id="party-select"
-            class="w-full border border-zinc-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors appearance-none cursor-pointer">
-            <option value="" class="bg-zinc-900">Choose an event&hellip;</option>
-            <option value="ozora" class="bg-zinc-900">⚡ Ozora Festival 2025 &mdash; Jul 18–22</option>
-            <option value="subsonic" class="bg-zinc-900">🎵 Subsonic 2025 &mdash; Aug 9–12</option>
-            <option value="boom" class="bg-zinc-900">🌍 Boom Festival 2025 &mdash; Aug 14–21</option>
-          </select>
+        <!-- Event select -->
+        <div class="form-panel" style="padding:1.5rem;">
+          <div class="section-label">בחר אירוע</div>
+          <div id="event-cards" style="display:flex;flex-direction:column;gap:.6rem;">
+            <div class="event-skeleton"></div>
+            <div class="event-skeleton"></div>
+          </div>
+          <p id="no-events-msg" style="display:none;font-size:.75rem;color:#475569;margin-top:.5rem;">אין אירועים פעילים. בקש מהמארגן ליצור אירוע תחילה.</p>
         </div>
 
-        <button id="validate-btn" onclick="validateTicket()"
-          class="btn-primary w-full text-white font-semibold py-3.5 rounded-xl text-sm tracking-wide">
-          Validate &amp; Enter Ride Board &rarr;
+        <button id="validate-btn" onclick="validateTicket()" class="btn-primary">
+          אמת כרטיס וכנס ללוח הנסיעות ←
         </button>
 
-        <div id="validate-error" class="hidden flex items-start gap-3 bg-red-950/50 border border-red-800/50 rounded-xl px-4 py-3">
-          <span class="text-red-400 shrink-0 mt-0.5">&#9888;</span>
-          <p id="validate-error-msg" class="text-red-300 text-sm">Please upload a ticket PDF and select a party before continuing.</p>
+        <div id="validate-error" style="display:none;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.3);border-radius:.75rem;padding:.75rem 1rem;display:flex;gap:.6rem;align-items:flex-start;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <p id="validate-error-msg" style="font-size:.82rem;color:#fb7185;">יש להעלות כרטיס ולבחור אירוע לפני המשך.</p>
         </div>
-
       </div>
     </div>
 
-
-  </div><!-- /max-w-2xl -->
+  </div>
 
   <script>
-    // ── Step navigation ───────────────────────────────────────────
     function show(stepName) {
-      document.querySelectorAll('[data-step]').forEach(el => el.classList.add('hidden'));
-      document.querySelector(`[data-step="${stepName}"]`).classList.remove('hidden');
+      document.querySelectorAll('[data-step]').forEach(el => el.style.display = 'none');
+      const target = document.querySelector(`[data-step="${stepName}"]`);
+      if (target) target.style.display = '';
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // ── Organizer form submit ─────────────────────────────────────
-    function submitOrganizer(e) {
+    // ── אחרי Google OAuth ────────────────────────
+    (async function handleOAuthReturn() {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.get('name')) return;
+
+      sessionStorage.setItem('username', params.get('name'));
+      sessionStorage.setItem('picture',  params.get('picture'));
+      sessionStorage.setItem('email',    params.get('email'));
+      window.history.replaceState({}, '', '/');
+
+      const name    = params.get('name');
+      const picture = params.get('picture');
+      const pill    = document.getElementById('user-pill-name');
+      const avatar  = document.getElementById('user-pill-avatar');
+      if (pill) pill.textContent = name;
+      if (avatar && picture) {
+        avatar.innerHTML = `<img src="${picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" referrerpolicy="no-referrer" />`;
+        avatar.style.background = 'transparent';
+      }
+
+      await loadEvents();
+      show('user-upload');
+    })();
+
+    async function submitOrganizer(e) {
       e.preventDefault();
-      const name   = document.getElementById('org-event-name').value || 'My Event';
-      const prefix = document.getElementById('org-prefix').value    || 'EVENT-';
-      const apiKey = 'frd_live_' + Math.random().toString(36).slice(2, 18).toUpperCase();
+      const btn   = document.getElementById('org-submit-btn');
+      const errEl = document.getElementById('org-error');
+      btn.disabled = true;
+      btn.textContent = 'יוצר אירוע...';
+      errEl.style.display = 'none';
 
-      document.getElementById('dash-event-name').textContent = name;
-      document.getElementById('dash-prefix').textContent     = prefix;
+      try {
+        let logoDataUrl = null;
+        const logoFile = document.getElementById('org-logo').files[0];
+        if (logoFile) {
+          logoDataUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(logoFile);
+          });
+        }
 
-      // Store the real key in data-value; display dots by default
-      const keyEl = document.getElementById('dash-api-key');
-      keyEl.dataset.value  = apiKey;
-      keyEl.textContent    = '••••••••••••••••••••';
-      keyEl.dataset.visible = 'false';
+        const res = await fetch('/api/events', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name:     document.getElementById('org-event-name').value,
+            location: document.getElementById('org-event-location').value,
+            date:     document.getElementById('org-event-date').value,
+            logo_url: logoDataUrl,
+          })
+        });
+        if (!res.ok) throw new Error('שגיאה ביצירת האירוע — נסה שוב.');
+        const ev = await res.json();
 
-      show('org-dashboard');
+        document.getElementById('dash-event-name').textContent = ev.name;
+        document.getElementById('dash-event-date').textContent = ev.date ? new Date(ev.date).toLocaleDateString('he-IL', {day:'numeric',month:'long',year:'numeric'}) : '—';
+        document.getElementById('dash-event-location').textContent = ev.location || '—';
+
+        if (ev.logo_url) {
+          const img  = document.getElementById('dash-logo-img');
+          const wrap = document.getElementById('dash-logo-wrap');
+          img.src = ev.logo_url;
+          wrap.style.display = 'block';
+        }
+
+        show('org-dashboard');
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+        btn.disabled    = false;
+        btn.textContent = 'צור אירוע ←';
+      }
     }
 
-    function toggleKey(btn) {
-      const keyEl  = document.getElementById('dash-api-key');
-      const isHidden = keyEl.dataset.visible === 'false';
-      keyEl.textContent    = isHidden ? keyEl.dataset.value : '••••••••••••••••••••';
-      keyEl.dataset.visible = isHidden ? 'true' : 'false';
-      btn.textContent      = isHidden ? 'Hide' : 'Show';
+    let selectedEventId = null;
+
+    function selectEventCard(card, eventId) {
+      document.querySelectorAll('#event-cards .event-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      selectedEventId = eventId;
+      document.getElementById('validate-error').style.display = 'none';
     }
 
-    function copyKey() {
-      const keyEl = document.getElementById('dash-api-key');
-      navigator.clipboard.writeText(keyEl.dataset.value);
-      const btn = document.getElementById('copy-btn');
-      btn.textContent = 'Copied!';
-      btn.classList.add('text-emerald-400');
-      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('text-emerald-400'); }, 2000);
+    async function loadEvents() {
+      const container = document.getElementById('event-cards');
+      const noMsg     = document.getElementById('no-events-msg');
+      try {
+        const events = await fetch('/api/events').then(r => r.json());
+        if (!events.length) {
+          container.innerHTML = '';
+          noMsg.style.display = 'block';
+          return;
+        }
+        container.innerHTML = events.map((ev, i) => `
+          <div class="event-card" data-event-id="${ev.id}" style="animation-delay:${i * 0.08}s;">
+            <div class="event-bolt">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:.9rem;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ev.name}</div>
+              ${ev.date ? `<div style="font-size:.72rem;color:#64748b;margin-top:.15rem;">${ev.date}</div>` : ''}
+            </div>
+            <div class="check-badge">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+          </div>`).join('');
+        container.querySelectorAll('.event-card').forEach(card => {
+          card.addEventListener('click', () => selectEventCard(card, card.dataset.eventId));
+        });
+      } catch {
+        container.innerHTML = '<p style="font-size:.78rem;color:#fb7185;">שגיאה בטעינת אירועים — רענן את הדף.</p>';
+      }
     }
 
-    // ── Instagram mock OAuth ──────────────────────────────────────
-    function mockInstagramLogin(btn) {
-      btn.disabled     = true;
-      btn.textContent  = 'Connecting to Instagram…';
-      setTimeout(() => show('user-upload'), 1300);
-    }
-
-    // ── File upload preview ───────────────────────────────────────
     function onFileSelect(input) {
       if (!input.files.length) return;
       document.getElementById('file-name').textContent = input.files[0].name;
-      document.getElementById('file-preview').classList.remove('hidden');
+      const preview = document.getElementById('file-preview');
+      preview.style.display = 'flex';
     }
 
-    // ── Ticket validation — calls the FastAPI backend via /api/validate ──
     async function validateTicket() {
-      const hasFile  = document.getElementById('ticket-file').files.length > 0;
-      const party    = document.getElementById('party-select').value;
-      const errEl    = document.getElementById('validate-error');
-      const errMsg   = document.getElementById('validate-error-msg');
-      const btn      = document.getElementById('validate-btn');
+      const fileInput = document.getElementById('ticket-file');
+      const eventId   = selectedEventId;
+      const errEl     = document.getElementById('validate-error');
+      const errMsg    = document.getElementById('validate-error-msg');
+      const btn       = document.getElementById('validate-btn');
 
-      if (!hasFile || !party) {
-        errMsg.textContent = 'Please upload a ticket PDF and select a party before continuing.';
-        errEl.classList.remove('hidden');
+      if (!fileInput.files.length || !eventId) {
+        errMsg.textContent = 'יש להעלות screenshot של הכרטיס ולבחור אירוע לפני המשך.';
+        errEl.style.display = 'flex';
         return;
       }
-
-      errEl.classList.add('hidden');
+      errEl.style.display = 'none';
       btn.disabled    = true;
-      btn.textContent = 'Validating ticket…';
+      btn.textContent = 'סורק כרטיס...';
 
       try {
-        const res  = await fetch('/api/validate', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ ticket_code: party + '-demo' }),
-        });
+        const form = new FormData();
+        form.append('event_id', eventId);
+        form.append('file', fileInput.files[0]);
+        const res  = await fetch('/api/validate', { method: 'POST', body: form });
         const data = await res.json();
-
         if (data.valid) {
+          sessionStorage.setItem('eventId', data.event_id);
           window.location.href = '/board';
         } else {
-          errMsg.textContent = data.error || 'Ticket validation failed.';
-          errEl.classList.remove('hidden');
+          errMsg.textContent = data.error || 'אימות כרטיס נכשל.';
+          errEl.style.display = 'flex';
           btn.disabled    = false;
-          btn.textContent = 'Validate & Enter Ride Board →';
+          btn.textContent = 'אמת כרטיס וכנס ללוח הנסיעות ←';
         }
       } catch {
-        window.location.href = '/board';
+        errMsg.textContent = 'שגיאת תקשורת — נסה שנית.';
+        errEl.style.display = 'flex';
+        btn.disabled    = false;
+        btn.textContent = 'אמת כרטיס וכנס ללוח הנסיעות ←';
       }
     }
   </script>
