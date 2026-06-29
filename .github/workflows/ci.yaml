@@ -1,0 +1,99 @@
+name: CI — Build & Push to ECR
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "k8s/**"
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  # ── Job 1: Lint ──────────────────────────────────────────────────────────────
+  lint:
+    name: Lint Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt ruff
+
+      - name: Lint with ruff
+        run: ruff check backend/ --select E,F,W --ignore E501
+
+  # ── Job 2: Build & Push to ECR (main branch only) ───────────────────────────
+  build-push:
+    name: Build & Push Images
+    needs: lint
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write   # needed to push image-tag commit back to repo
+      id-token: write   # needed for OIDC auth (alternative to static keys)
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push backend
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/fastiride-dev-backend:$TAG ./backend
+          docker tag  $REGISTRY/fastiride-dev-backend:$TAG \
+                      $REGISTRY/fastiride-dev-backend:latest
+          docker push $REGISTRY/fastiride-dev-backend:$TAG
+          docker push $REGISTRY/fastiride-dev-backend:latest
+
+      - name: Build & push frontend
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/fastiride-dev-frontend:$TAG ./frontend
+          docker tag  $REGISTRY/fastiride-dev-frontend:$TAG \
+                      $REGISTRY/fastiride-dev-frontend:latest
+          docker push $REGISTRY/fastiride-dev-frontend:$TAG
+          docker push $REGISTRY/fastiride-dev-frontend:latest
+
+      # GitOps: update image tags in kustomization → ArgoCD picks up the change
+      - name: Update image tags (GitOps trigger)
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          cd k8s/overlays/dev
+          # kustomize edit set image rewrites the newTag field in kustomization.yaml
+          kustomize edit set image \
+            backend-image=$REGISTRY/fastiride-dev-backend:$TAG \
+            frontend-image=$REGISTRY/fastiride-dev-frontend:$TAG
+          git config user.email "ci@fastiride.app"
+          git config user.name  "FastiRide CI"
+          git add kustomization.yaml
+          git diff --staged --quiet || \
+            git commit -m "ci: bump images → $TAG [skip ci]"
+          git push
