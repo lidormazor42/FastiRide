@@ -27,6 +27,7 @@ class RideCreate(BaseModel):
     driver_name: str
     driver_age: Optional[int] = None
     driver_photo: Optional[str] = None
+    driver_email: Optional[str] = None
     vehicle_type: Optional[str] = None
     city: str
     pickup_point: str
@@ -50,8 +51,28 @@ class RideUpdate(BaseModel):
     vehicle_type: Optional[str] = None
 
 
+class UserOut(BaseModel):
+    id: int
+    name: str
+    email: str
+    picture: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class UserEventOut(BaseModel):
+    event_id: int
+    event: EventOut
+    validated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class RideRequestCreate(BaseModel):
     passenger_name: str
+    passenger_email: Optional[str] = None
 
 
 class RideRequestOut(RideRequestCreate):

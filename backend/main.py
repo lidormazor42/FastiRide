@@ -1,9 +1,11 @@
 import os
 from io import BytesIO
-from urllib.parse import urlencode, quote
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
+from urllib.parse import urlencode
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Cookie, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from jose import jwt, JWTError
 import httpx
 from PIL import Image
 from pyzbar.pyzbar import decode as qr_decode
@@ -11,6 +13,9 @@ import pytesseract
 from database import engine, get_db, Base
 import models
 import schemas
+from email_service import send_join_notification, send_cancel_notification
+
+SESSION_SECRET = os.getenv("SESSION_SECRET", "fastiride-dev-secret-change-in-prod")
 
 Base.metadata.create_all(bind=engine)
 
@@ -19,9 +24,11 @@ from sqlalchemy import text
 with engine.connect() as _conn:
     _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS driver_age INTEGER"))
     _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS driver_photo TEXT"))
+    _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS driver_email TEXT"))
     _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS vehicle_type TEXT"))
     _conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS logo_url TEXT"))
     _conn.execute(text("ALTER TABLE events ALTER COLUMN ticket_prefix DROP NOT NULL"))
+    _conn.execute(text("ALTER TABLE ride_requests ADD COLUMN IF NOT EXISTS passenger_email TEXT"))
     _conn.commit()
 
 app = FastAPI()
@@ -29,6 +36,22 @@ app = FastAPI()
 GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI  = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost/api/auth/google/callback")
+
+
+# ── Session helpers ───────────────────────────────────────────────
+def _make_token(user_id: int) -> str:
+    return jwt.encode({"sub": str(user_id)}, SESSION_SECRET, algorithm="HS256")
+
+
+def _get_user_from_cookie(session: str, db: Session) -> models.User | None:
+    if not session:
+        return None
+    try:
+        payload = jwt.decode(session, SESSION_SECRET, algorithms=["HS256"])
+        user_id = int(payload["sub"])
+    except (JWTError, KeyError, ValueError):
+        return None
+    return db.query(models.User).filter(models.User.id == user_id).first()
 
 
 # ── Health ────────────────────────────────────────────────────────
@@ -52,7 +75,7 @@ async def google_login():
 
 
 @app.get("/api/auth/google/callback")
-async def google_callback(code: str):
+async def google_callback(code: str, db: Session = Depends(get_db)):
     async with httpx.AsyncClient() as client:
         token_res = await client.post(
             "https://oauth2.googleapis.com/token",
@@ -70,13 +93,51 @@ async def google_callback(code: str):
             "https://www.googleapis.com/oauth2/v2/userinfo",
             headers={"Authorization": f"Bearer {access_token}"},
         )
-        user = user_res.json()
+        guser = user_res.json()
 
-    name    = quote(user.get("name", "משתמש"), safe="")
-    picture = quote(user.get("picture", ""), safe="")
-    email   = quote(user.get("email", ""), safe="")
+    google_id = guser.get("id", "")
+    name      = guser.get("name", "משתמש")
+    email     = guser.get("email", "")
+    picture   = guser.get("picture", "")
 
-    return RedirectResponse(f"/?name={name}&picture={picture}&email={email}")
+    user = db.query(models.User).filter(models.User.google_id == google_id).first()
+    if not user:
+        user = models.User(google_id=google_id, name=name, email=email, picture=picture)
+        db.add(user)
+    else:
+        user.name    = name
+        user.picture = picture
+    db.commit()
+    db.refresh(user)
+
+    redirect = RedirectResponse("/")
+    redirect.set_cookie(
+        "session", _make_token(user.id),
+        httponly=True, samesite="lax", max_age=30 * 24 * 3600, path="/",
+    )
+    return redirect
+
+
+@app.get("/api/me", response_model=schemas.UserOut)
+def get_me(session: str = Cookie(default=None), db: Session = Depends(get_db)):
+    user = _get_user_from_cookie(session, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="לא מחובר")
+    return user
+
+
+@app.get("/api/me/events", response_model=list[schemas.UserEventOut])
+def get_my_events(session: str = Cookie(default=None), db: Session = Depends(get_db)):
+    user = _get_user_from_cookie(session, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="לא מחובר")
+    return user.validated_events
+
+
+@app.post("/api/auth/logout")
+def logout(response: Response):
+    response.delete_cookie("session")
+    return {"ok": True}
 
 
 # ── Ticket validation ─────────────────────────────────────────────
@@ -94,6 +155,7 @@ async def validate(
     event_id: int        = Form(...),
     file:     UploadFile = File(...),
     db:       Session    = Depends(get_db),
+    session:  str        = Cookie(default=None),
 ):
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
@@ -119,6 +181,13 @@ async def validate(
         pass
 
     if _ticket_matches(qr_text, ocr_text, event.name):
+        user = _get_user_from_cookie(session, db)
+        if user:
+            try:
+                db.add(models.UserEvent(user_id=user.id, event_id=event.id))
+                db.commit()
+            except IntegrityError:
+                db.rollback()
         return {"valid": True, "event_name": event.name, "event_id": event.id}
 
     return {"valid": False, "error": f"הכרטיס לא תואם לאירוע '{event.name}'"}
@@ -149,11 +218,21 @@ def get_rides(event_id: int = None, db: Session = Depends(get_db)):
 
 
 @app.post("/api/rides", response_model=schemas.RideOut)
-def create_ride(ride: schemas.RideCreate, db: Session = Depends(get_db)):
+def create_ride(
+    ride: schemas.RideCreate,
+    db: Session = Depends(get_db),
+    session: str = Cookie(default=None),
+):
     event = db.query(models.Event).filter(models.Event.id == ride.event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="האירוע לא נמצא")
-    db_ride = models.Ride(**ride.model_dump())
+    ride_data = ride.model_dump()
+    # Guarantee driver_email is always saved — fill from session if client didn't send it
+    if not ride_data.get("driver_email"):
+        user = _get_user_from_cookie(session, db)
+        if user:
+            ride_data["driver_email"] = user.email
+    db_ride = models.Ride(**ride_data)
     db.add(db_ride)
     db.commit()
     db.refresh(db_ride)
@@ -161,10 +240,19 @@ def create_ride(ride: schemas.RideCreate, db: Session = Depends(get_db)):
 
 
 @app.patch("/api/rides/{ride_id}", response_model=schemas.RideOut)
-def update_ride(ride_id: int, updates: schemas.RideUpdate, db: Session = Depends(get_db)):
+def update_ride(
+    ride_id: int,
+    updates: schemas.RideUpdate,
+    db: Session = Depends(get_db),
+    session: str = Cookie(default=None),
+):
     ride = db.query(models.Ride).filter(models.Ride.id == ride_id).first()
     if not ride:
         raise HTTPException(status_code=404, detail="הנסיעה לא נמצאה")
+    user = _get_user_from_cookie(session, db)
+    # If the ride has an owner email, enforce it matches the session user
+    if ride.driver_email and (not user or ride.driver_email != user.email):
+        raise HTTPException(status_code=403, detail="אין הרשאה לערוך נסיעה זו")
     for field, value in updates.model_dump(exclude_unset=True).items():
         setattr(ride, field, value)
     db.commit()
@@ -173,10 +261,18 @@ def update_ride(ride_id: int, updates: schemas.RideUpdate, db: Session = Depends
 
 
 @app.delete("/api/rides/{ride_id}")
-def delete_ride(ride_id: int, db: Session = Depends(get_db)):
+def delete_ride(
+    ride_id: int,
+    db: Session = Depends(get_db),
+    session: str = Cookie(default=None),
+):
     ride = db.query(models.Ride).filter(models.Ride.id == ride_id).first()
     if not ride:
         raise HTTPException(status_code=404, detail="הנסיעה לא נמצאה")
+    user = _get_user_from_cookie(session, db)
+    # If the ride has an owner email, enforce it matches the session user
+    if ride.driver_email and (not user or ride.driver_email != user.email):
+        raise HTTPException(status_code=403, detail="אין הרשאה למחוק נסיעה זו")
     db.delete(ride)
     db.commit()
     return {"ok": True}
@@ -193,4 +289,31 @@ def join_ride(ride_id: int, req: schemas.RideRequestCreate, db: Session = Depend
     db.add(db_req)
     db.commit()
     db.refresh(db_req)
+    send_join_notification(
+        driver_email=ride.driver_email or "",
+        driver_name=ride.driver_name,
+        passenger_name=req.passenger_name,
+        ride_city=ride.city,
+        departure_time=ride.departure_time,
+    )
     return db_req
+
+
+@app.delete("/api/rides/{ride_id}/join/{request_id}")
+def cancel_join(ride_id: int, request_id: int, db: Session = Depends(get_db)):
+    req = db.query(models.RideRequest).filter(
+        models.RideRequest.id == request_id,
+        models.RideRequest.ride_id == ride_id,
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="הבקשה לא נמצאה")
+    ride = req.ride
+    send_cancel_notification(
+        driver_email=ride.driver_email or "",
+        driver_name=ride.driver_name,
+        passenger_name=req.passenger_name,
+        ride_city=ride.city,
+    )
+    db.delete(req)
+    db.commit()
+    return {"ok": True}

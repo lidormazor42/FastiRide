@@ -1,7 +1,33 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id        = Column(Integer, primary_key=True, index=True)
+    google_id = Column(String, unique=True, nullable=False)
+    name      = Column(String, nullable=False)
+    email     = Column(String, nullable=False)
+    picture   = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    validated_events = relationship("UserEvent", back_populates="user")
+
+
+class UserEvent(Base):
+    __tablename__ = "user_events"
+    __table_args__ = (UniqueConstraint("user_id", "event_id"),)
+
+    id           = Column(Integer, primary_key=True, index=True)
+    user_id      = Column(Integer, ForeignKey("users.id"), nullable=False)
+    event_id     = Column(Integer, ForeignKey("events.id"), nullable=False)
+    validated_at = Column(DateTime, default=datetime.utcnow)
+
+    user  = relationship("User", back_populates="validated_events")
+    event = relationship("Event")
 
 
 class Event(Base):
@@ -27,22 +53,24 @@ class Ride(Base):
     pickup_point = Column(String, nullable=False)
     departure_time = Column(String, nullable=False)
     seats_available = Column(Integer, default=2)
-    driver_age = Column(Integer, nullable=True)
+    driver_age   = Column(Integer, nullable=True)
     driver_photo = Column(String, nullable=True)
+    driver_email = Column(String, nullable=True)
     vehicle_type = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at   = Column(DateTime, default=datetime.utcnow)
 
     event = relationship("Event", back_populates="rides")
-    requests = relationship("RideRequest", back_populates="ride")
+    requests = relationship("RideRequest", back_populates="ride", cascade="all, delete-orphan")
 
 
 class RideRequest(Base):
     __tablename__ = "ride_requests"
 
-    id = Column(Integer, primary_key=True, index=True)
-    ride_id = Column(Integer, ForeignKey("rides.id"), nullable=False)
-    passenger_name = Column(String, nullable=False)
-    status = Column(String, default="pending")  # pending | approved | rejected
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id              = Column(Integer, primary_key=True, index=True)
+    ride_id         = Column(Integer, ForeignKey("rides.id"), nullable=False)
+    passenger_name  = Column(String, nullable=False)
+    passenger_email = Column(String, nullable=True)
+    status          = Column(String, default="pending")
+    created_at      = Column(DateTime, default=datetime.utcnow)
 
     ride = relationship("Ride", back_populates="requests")
