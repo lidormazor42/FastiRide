@@ -6,16 +6,19 @@
   <title>FastiRide</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root {
-      --bg:      #0b0b1a;
-      --violet:  #7c3aed;
-      --cyan:    #22d3ee;
-      --rose:    #f43f5e;
-      --text:    #e2e8f0;
-      --muted:   #64748b;
+      --bg:        #0A0A0A;
+      --surface:   #141414;
+      --border:    #252525;
+      --fire:      #FF3300;
+      --fire-d:    #E52B00;
+      --green:     #22C55E;
+      --rose:      #EF4444;
+      --text:      #F5F5F5;
+      --muted:     #666666;
     }
 
     * { box-sizing: border-box; }
@@ -23,249 +26,198 @@
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: 'Heebo', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: 'Rubik', 'Heebo', -apple-system, BlinkMacSystemFont, sans-serif;
       min-height: 100vh;
     }
 
-    body::before {
-      content: '';
-      position: fixed; inset: 0; z-index: 0; pointer-events: none;
-      background:
-        radial-gradient(ellipse 55% 45% at 10%  0%,   rgba(124,58,237,.38) 0%, transparent 65%),
-        radial-gradient(ellipse 45% 40% at 90%  85%,  rgba(34,211,238,.22) 0%, transparent 60%),
-        radial-gradient(ellipse 50% 40% at 80%  10%,  rgba(99,102,241,.18) 0%, transparent 60%),
-        radial-gradient(ellipse 35% 30% at 50%  50%,  rgba(124,58,237,.1)  0%, transparent 70%);
+    /* ── Grid canvas bg ─────────────────────────── */
+    #grid-canvas {
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      z-index: 0; pointer-events: none;
+    }
+
+    /* ── 3D card tilt ───────────────────────────── */
+    .role-card {
+      transform-style: preserve-3d;
+      will-change: transform;
     }
 
     /* ── Animations ─────────────────────────────── */
     @keyframes fadeUp {
-      from { opacity:0; transform:translateY(22px); }
+      from { opacity:0; transform:translateY(18px); }
       to   { opacity:1; transform:translateY(0); }
-    }
-    @keyframes shimmerText {
-      0%   { background-position:-200% center; }
-      100% { background-position: 200% center; }
     }
     @keyframes dotPulse {
       0%,100% { opacity:1; }
-      50%     { opacity:.3; }
-    }
-    @keyframes pulseRing {
-      0%  { box-shadow:0 0 0 0   rgba(124,58,237,.5); }
-      70% { box-shadow:0 0 0 10px rgba(124,58,237,0); }
-      100%{ box-shadow:0 0 0 0   rgba(124,58,237,0); }
+      50%      { opacity:.3; }
     }
 
-    .fade-up   { animation:fadeUp .65s ease-out both; }
-    .delay-1   { animation-delay:.1s; }
-    .delay-2   { animation-delay:.22s; }
-    .delay-3   { animation-delay:.36s; }
-    .delay-4   { animation-delay:.5s; }
+    .fade-up  { animation:fadeUp .6s ease-out both; }
+    .delay-1  { animation-delay:.1s; }
+    .delay-2  { animation-delay:.2s; }
+    .delay-3  { animation-delay:.35s; }
+    .delay-4  { animation-delay:.5s; }
 
-    /* ── Logo gradient ──────────────────────────── */
-    .logo-text {
-      background: linear-gradient(120deg, #c4b5fd 0%, #818cf8 30%, #22d3ee 65%, #c4b5fd 100%);
-      background-size: 200% auto;
-      -webkit-background-clip:text; background-clip:text;
-      -webkit-text-fill-color:transparent;
-      animation:shimmerText 4.5s linear infinite;
-    }
+    /* ── Logo ───────────────────────────────────── */
+    .logo-text { color: #F5F5F5; font-family: 'Rubik', sans-serif; }
 
-    /* ── Glass surface ──────────────────────────── */
+    /* ── Live badge ─────────────────────────────── */
     .glass-surface {
-      background: rgba(255,255,255,.025);
-      backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px);
-      border:1px solid rgba(255,255,255,.07);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
     }
 
     /* ── Role card ──────────────────────────────── */
     .role-card {
-      background: linear-gradient(145deg, rgba(20,18,48,.92) 0%, rgba(10,10,28,.97) 100%);
-      border:1px solid rgba(124,58,237,.28);
-      border-radius:1.75rem;
-      padding:2rem;
-      cursor:pointer;
-      text-align:right;
-      transition:transform .28s cubic-bezier(.34,1.56,.64,1), box-shadow .28s ease, border-color .28s ease;
-      position:relative; overflow:hidden;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 1.5rem;
+      padding: 2rem;
+      cursor: pointer;
+      text-align: right;
+      transition: transform .22s ease, box-shadow .22s ease, border-color .18s ease;
+      position: relative;
     }
-    .role-card::before {
-      content:''; position:absolute; inset:0; pointer-events:none;
-      background:radial-gradient(ellipse 90% 80% at 0% 0%, rgba(124,58,237,.12) 0%, transparent 60%);
-      transition: opacity .3s;
-    }
-    .role-card:hover::before { opacity: 1.5; }
-    .role-card:hover {
-      transform:translateY(-8px) scale(1.02);
-      box-shadow:0 32px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(124,58,237,.4), inset 0 1px 0 rgba(255,255,255,.08);
-    }
-    .role-card.role-attendee:hover { border-color:rgba(124,58,237,.7); box-shadow:0 28px 70px rgba(0,0,0,.45), 0 0 40px rgba(124,58,237,.25); }
-    .role-card.role-organizer:hover { border-color:rgba(34,211,238,.6); box-shadow:0 28px 70px rgba(0,0,0,.45), 0 0 40px rgba(34,211,238,.2); }
-    .role-card .card-glow-strip {
-      position:absolute; top:0; right:0; left:0; height:2px;
-      background:linear-gradient(90deg,transparent,rgba(124,58,237,.8),rgba(34,211,238,.6),transparent);
-    }
-    .role-card.role-organizer .card-glow-strip {
-      background:linear-gradient(90deg,transparent,rgba(34,211,238,.8),rgba(124,58,237,.5),transparent);
-    }
+    .role-card::before { display: none; }
+    .role-card:hover { transform: translateY(-5px); box-shadow: 0 20px 50px rgba(0,0,0,.5); }
+    .role-card.role-attendee:hover { border-color: #FF3300; }
+    .role-card.role-organizer:hover { border-color: #F97316; }
+    .role-card .card-glow-strip { display: none; }
     .role-card .icon-wrap {
-      width:56px; height:56px; border-radius:16px;
-      background:rgba(124,58,237,.15);
-      border:1px solid rgba(124,58,237,.35);
-      display:flex; align-items:center; justify-content:center;
-      margin-bottom:1.5rem;
-      transition:transform .3s cubic-bezier(.34,1.56,.64,1), box-shadow .3s;
+      width: 52px; height: 52px; border-radius: 14px;
+      background: rgba(255,51,0,.1);
+      border: 1px solid rgba(255,51,0,.28);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1.5rem;
+      transition: transform .22s ease;
     }
     .role-card.role-organizer .icon-wrap {
-      background:rgba(34,211,238,.1);
-      border-color:rgba(34,211,238,.3);
+      background: rgba(249,115,22,.1);
+      border-color: rgba(249,115,22,.28);
     }
-    .role-card:hover .icon-wrap {
-      transform:scale(1.15) rotate(-6deg);
-      box-shadow:0 0 28px rgba(124,58,237,.5);
-    }
-    .role-card.role-organizer:hover .icon-wrap { box-shadow:0 0 28px rgba(34,211,238,.4); }
+    .role-card:hover .icon-wrap { transform: scale(1.1); }
 
-    /* ── Panel (forms) ──────────────────────────── */
+    /* ── Form panel ─────────────────────────────── */
     .form-panel {
-      background:linear-gradient(145deg,rgba(17,17,40,.9) 0%, rgba(13,13,30,.95) 100%);
-      border:1px solid rgba(124,58,237,.18);
-      border-radius:1.25rem;
-      backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
     }
 
     /* ── Inputs ─────────────────────────────────── */
     .field {
-      background:rgba(0,0,0,.4);
-      border:1px solid rgba(255,255,255,.08);
-      color:var(--text);
-      border-radius:.75rem;
-      padding:.6rem 1rem;
-      font-size:.875rem;
-      font-family:inherit;
-      width:100%;
-      transition:border-color .2s, box-shadow .2s;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: .75rem;
+      padding: .6rem 1rem;
+      font-size: .875rem;
+      font-family: inherit;
+      width: 100%;
+      transition: border-color .2s, box-shadow .2s;
     }
-    .field::placeholder { color:#475569; }
-    .field:focus { outline:none; border-color:rgba(124,58,237,.7); box-shadow:0 0 0 3px rgba(124,58,237,.12); }
-    select.field { cursor:pointer; appearance:none; }
-    input[type="date"].field::-webkit-calendar-picker-indicator { filter:invert(.5); cursor:pointer; }
+    .field::placeholder { color: #444444; }
+    .field:focus { outline: none; border-color: #FF3300; box-shadow: 0 0 0 3px rgba(255,51,0,.12); }
+    select.field { cursor: pointer; appearance: none; }
+    input[type="date"].field::-webkit-calendar-picker-indicator { filter: invert(.5); cursor: pointer; }
 
     /* ── Event cards picker ─────────────────────── */
     .event-card {
-      display:flex; align-items:center; gap:.875rem;
-      background:linear-gradient(145deg,rgba(20,18,45,.85) 0%, rgba(13,13,30,.92) 100%);
-      border:1px solid rgba(124,58,237,.18);
-      border-radius:.9rem;
-      padding:.8rem 1rem;
-      cursor:pointer;
-      transition:border-color .2s, box-shadow .2s, background .2s;
-      animation:fadeUp .5s ease-out both;
+      display: flex; align-items: center; gap: .875rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: .9rem;
+      padding: .8rem 1rem;
+      cursor: pointer;
+      transition: border-color .2s;
+      animation: fadeUp .5s ease-out both;
     }
-    .event-card:hover {
-      border-color:rgba(124,58,237,.45);
-      box-shadow:0 0 16px rgba(124,58,237,.18);
-    }
-    .event-card.selected {
-      border-color:#7c3aed;
-      background:linear-gradient(145deg,rgba(124,58,237,.14) 0%, rgba(13,13,30,.95) 100%);
-      box-shadow:0 0 20px rgba(124,58,237,.35);
-    }
+    .event-card:hover { border-color: rgba(255,51,0,.4); }
+    .event-card.selected { border-color: #FF3300; background: rgba(255,51,0,.06); }
     .event-bolt {
-      width:40px; height:40px; border-radius:11px; flex-shrink:0;
-      background:rgba(124,58,237,.12);
-      border:1px solid rgba(124,58,237,.25);
-      display:flex; align-items:center; justify-content:center;
-      transition:box-shadow .2s, background .2s;
+      width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0;
+      background: rgba(255,51,0,.1);
+      border: 1px solid rgba(255,51,0,.25);
+      display: flex; align-items: center; justify-content: center;
     }
-    .event-card.selected .event-bolt {
-      background:rgba(124,58,237,.25);
-      box-shadow:0 0 14px rgba(124,58,237,.4);
-    }
+    .event-card.selected .event-bolt { background: rgba(255,51,0,.2); }
     .event-card .check-badge {
-      width:22px; height:22px; border-radius:50%; flex-shrink:0;
-      background:rgba(34,211,238,.15);
-      border:1px solid rgba(34,211,238,.5);
-      display:flex; align-items:center; justify-content:center;
-      opacity:0; transform:scale(.5);
-      transition:opacity .2s, transform .2s;
+      width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+      background: rgba(34,197,94,.15);
+      border: 1px solid rgba(34,197,94,.5);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transform: scale(.5);
+      transition: opacity .2s, transform .2s;
     }
-    .event-card.selected .check-badge { opacity:1; transform:scale(1); }
+    .event-card.selected .check-badge { opacity: 1; transform: scale(1); }
     .event-skeleton {
-      height:64px; border-radius:.9rem;
-      background:linear-gradient(90deg,rgba(124,58,237,.06) 25%,rgba(124,58,237,.14) 50%,rgba(124,58,237,.06) 75%);
-      background-size:200% 100%;
-      animation:skeletonShimmer 1.4s ease-in-out infinite;
+      height: 64px; border-radius: .9rem;
+      background: var(--surface);
+      animation: skeletonPulse 1.6s ease-in-out infinite;
     }
-    @keyframes skeletonShimmer {
-      0%   { background-position:200% 0; }
-      100% { background-position:-200% 0; }
+    @keyframes skeletonPulse {
+      0%,100% { opacity: .35; }
+      50%      { opacity: .7; }
     }
 
     /* ── Primary button ─────────────────────────── */
     .btn-primary {
-      width:100%; border:none; cursor:pointer;
-      font-family:inherit; font-weight:700; font-size:.875rem; letter-spacing:.02em;
-      padding:.9rem; border-radius:.875rem;
-      background:linear-gradient(135deg,#7c3aed 0%,#06b6d4 100%);
-      color:#fff;
-      transition:opacity .2s, transform .2s, box-shadow .3s;
-      position:relative; overflow:hidden;
+      width: 100%; border: none; cursor: pointer;
+      font-family: inherit; font-weight: 700; font-size: .9rem;
+      padding: .9rem; border-radius: .875rem;
+      background: #FF3300;
+      color: #fff;
+      transition: background .18s, transform .15s;
     }
-    .btn-primary::after {
-      content:''; position:absolute; inset:0; pointer-events:none;
-      background:linear-gradient(135deg,rgba(255,255,255,.15) 0%,transparent 55%);
-    }
-    .btn-primary:hover:not(:disabled) {
-      opacity:.9; transform:translateY(-1px);
-      box-shadow:0 0 30px rgba(124,58,237,.5), 0 0 60px rgba(34,211,238,.15);
-    }
-    .btn-primary:disabled { opacity:.45; cursor:not-allowed; transform:none; box-shadow:none; }
+    .btn-primary:hover:not(:disabled) { background: #E52B00; transform: translateY(-1px); }
+    .btn-primary:active:not(:disabled) { transform: scale(.98); }
+    .btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
 
     /* ── Google button ──────────────────────────── */
     .btn-google {
-      display:flex; align-items:center; justify-content:center; gap:.75rem;
-      width:100%; border:none; cursor:pointer;
-      font-family:inherit; font-weight:600; font-size:.875rem;
-      padding:.875rem; border-radius:.875rem;
-      background:#fff; color:#111827;
-      transition:transform .2s, box-shadow .2s;
-      text-decoration:none;
+      display: flex; align-items: center; justify-content: center; gap: .75rem;
+      width: 100%; border: none; cursor: pointer;
+      font-family: inherit; font-weight: 600; font-size: .875rem;
+      padding: .875rem; border-radius: .875rem;
+      background: #fff; color: #111827;
+      transition: transform .2s, box-shadow .2s;
+      text-decoration: none;
     }
-    .btn-google:hover {
-      transform:translateY(-1px);
-      box-shadow:0 8px 28px rgba(0,0,0,.35);
-    }
+    .btn-google:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,0,0,.3); }
 
     /* ── Step indicators ────────────────────────── */
     .step-active {
-      width:26px; height:26px; border-radius:50%;
-      background:linear-gradient(135deg,#7c3aed,#22d3ee);
-      display:flex; align-items:center; justify-content:center;
-      color:#fff; font-size:.72rem; font-weight:700;
-      animation:pulseRing 2.2s infinite;
-      flex-shrink:0;
+      width: 26px; height: 26px; border-radius: 50%;
+      background: #FF3300;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: .72rem; font-weight: 800;
+      flex-shrink: 0;
     }
     .step-done {
-      width:26px; height:26px; border-radius:50%;
-      background:linear-gradient(135deg,#059669,#22c55e);
-      display:flex; align-items:center; justify-content:center;
-      color:#fff; font-size:.7rem; font-weight:700; flex-shrink:0;
+      width: 26px; height: 26px; border-radius: 50%;
+      background: #22C55E;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: .7rem; font-weight: 700; flex-shrink: 0;
     }
     .step-idle {
-      width:26px; height:26px; border-radius:50%;
-      background:#1e293b; border:1px solid #334155;
-      display:flex; align-items:center; justify-content:center;
-      color:#475569; font-size:.72rem; font-weight:700; flex-shrink:0;
+      width: 26px; height: 26px; border-radius: 50%;
+      background: var(--surface); border: 1.5px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      color: #444444; font-size: .72rem; font-weight: 700; flex-shrink: 0;
     }
 
     /* ── Section header ─────────────────────────── */
     .section-label {
-      font-size:.78rem; font-weight:700; color:#94a3b8; margin-bottom:1rem;
+      font-size: .78rem; font-weight: 700; color: var(--muted);
+      margin-bottom: 1rem; text-transform: uppercase; letter-spacing: .04em;
     }
   </style>
 </head>
 <body style="display:flex;align-items:flex-start;justify-content:center;padding:3.5rem 1rem 5rem;position:relative;overflow-x:hidden;">
+
+  <!-- Synthwave perspective grid -->
+  <canvas id="grid-canvas"></canvas>
 
   <div style="position:relative;width:100%;max-width:640px;z-index:1;">
 
@@ -277,13 +229,12 @@
       <!-- Hero -->
       <div style="text-align:center;margin-bottom:3rem;" class="fade-up">
         <div style="display:inline-flex;align-items:center;gap:.875rem;margin-bottom:1.25rem;">
-          <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,rgba(124,58,237,.25),rgba(34,211,238,.15));border:1px solid rgba(124,58,237,.45);display:flex;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(124,58,237,.35),0 0 60px rgba(124,58,237,.12);">
+          <div style="width:56px;height:56px;border-radius:16px;background:rgba(255,51,0,.12);border:1.5px solid rgba(255,51,0,.35);display:flex;align-items:center;justify-content:center;">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-              <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="url(#hero-lg)" stroke="url(#hero-lg)" stroke-width=".5" stroke-linejoin="round"/>
-              <defs><linearGradient id="hero-lg" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#c4b5fd"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+              <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="#FF3300" stroke="#FF3300" stroke-width=".5" stroke-linejoin="round"/>
             </svg>
           </div>
-          <span class="logo-text" style="font-size:3.2rem;font-weight:900;letter-spacing:-.04em;font-family:'Outfit',sans-serif;">FastiRide</span>
+          <span class="logo-text" style="font-size:3.2rem;font-weight:900;letter-spacing:-.04em;">FastiRide</span>
         </div>
         <p style="font-size:1rem;color:#94a3b8;font-weight:500;letter-spacing:-.01em;">פלטפורמת שיתוף נסיעות לאירועים ופסטיבלים</p>
         <p style="font-size:.82rem;color:#4a5568;margin-top:.5rem;font-weight:500;">מי אתה היום?</p>
@@ -293,16 +244,16 @@
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;" class="fade-up delay-2">
 
         <!-- Attendee card -->
-        <button onclick="show('user-login')" class="role-card role-attendee" style="border:none;">
+        <button onclick="handleAttendeeClick()" class="role-card role-attendee" style="border:none;">
           <div class="card-glow-strip"></div>
           <div class="icon-wrap">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 11l19-9-9 19-2-8-8-2z"/>
             </svg>
           </div>
-          <h2 style="font-size:1.25rem;font-weight:800;color:#f1f5f9;margin-bottom:.5rem;font-family:'Outfit',sans-serif;letter-spacing:-.02em;">אני מגיע לאירוע</h2>
-          <p style="font-size:.84rem;color:#7c8db5;line-height:1.65;margin-bottom:1.75rem;">העלה כרטיס פסטיבל ומצא או פרסם נסיעה משותפת.</p>
-          <div style="display:inline-flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:700;color:#c4b5fd;background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.3);border-radius:999px;padding:.35rem .9rem;">
+          <h2 style="font-size:1.25rem;font-weight:800;color:#F5F5F5;margin-bottom:.5rem;letter-spacing:-.02em;">אני מגיע לאירוע</h2>
+          <p style="font-size:.84rem;color:#666666;line-height:1.65;margin-bottom:1.75rem;">העלה כרטיס פסטיבל ומצא או פרסם נסיעה משותפת.</p>
+          <div style="display:inline-flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:700;color:#FF3300;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.3);border-radius:999px;padding:.35rem .9rem;">
             <span>התחל</span>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
           </div>
@@ -312,13 +263,13 @@
         <button onclick="show('organizer')" class="role-card role-organizer" style="border:none;">
           <div class="card-glow-strip"></div>
           <div class="icon-wrap">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#67e8f9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
             </svg>
           </div>
-          <h2 style="font-size:1.25rem;font-weight:800;color:#f1f5f9;margin-bottom:.5rem;font-family:'Outfit',sans-serif;letter-spacing:-.02em;">אני מארגן</h2>
-          <p style="font-size:.84rem;color:#7c8db5;line-height:1.65;margin-bottom:1.75rem;">רשום את האירוע שלך, אמת כרטיסים ונהל את קבוצת הטרמפים.</p>
-          <div style="display:inline-flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:700;color:#67e8f9;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.28);border-radius:999px;padding:.35rem .9rem;">
+          <h2 style="font-size:1.25rem;font-weight:800;color:#F5F5F5;margin-bottom:.5rem;letter-spacing:-.02em;">אני מארגן</h2>
+          <p style="font-size:.84rem;color:#666666;line-height:1.65;margin-bottom:1.75rem;">רשום את האירוע שלך, אמת כרטיסים ונהל את קבוצת הטרמפים.</p>
+          <div style="display:inline-flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:700;color:#F97316;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.28);border-radius:999px;padding:.35rem .9rem;">
             <span>הגדר אירוע</span>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
           </div>
@@ -342,7 +293,7 @@
     <div data-step="organizer" style="display:none;">
       <button onclick="show('landing')"
         style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#475569;background:none;border:none;cursor:pointer;font-family:inherit;margin-bottom:2rem;padding:0;transition:color .2s;"
-        onmouseover="this.style.color='#a78bfa'" onmouseout="this.style.color='#475569'">
+        onmouseover="this.style.color='#FF6655'" onmouseout="this.style.color='#475569'">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         חזרה
       </button>
@@ -397,8 +348,8 @@
             </div>
             <div style="grid-column:1/-1;">
               <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">לוגו האירוע</label>
-              <label id="org-logo-label" style="display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;background:rgba(124,58,237,.06);border:1.5px dashed rgba(124,58,237,.3);border-radius:.75rem;cursor:pointer;transition:border-color .2s,background .2s;" onmouseover="this.style.borderColor='rgba(124,58,237,.6)';this.style.background='rgba(124,58,237,.1)'" onmouseout="this.style.borderColor='rgba(124,58,237,.3)';this.style.background='rgba(124,58,237,.06)'">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <label id="org-logo-label" style="display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;background:rgba(255,51,0,.05);border:1.5px dashed rgba(255,51,0,.3);border-radius:.75rem;cursor:pointer;transition:border-color .2s,background .2s;" onmouseover="this.style.borderColor='rgba(255,51,0,.6)';this.style.background='rgba(255,51,0,.08)'" onmouseout="this.style.borderColor='rgba(255,51,0,.3)';this.style.background='rgba(255,51,0,.05)'">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 <span id="org-logo-name" style="font-size:.8rem;color:#64748b;">העלה לוגו (PNG / JPG)</span>
                 <input id="org-logo" type="file" accept="image/*" style="display:none;" onchange="const f=this.files[0];if(f)document.getElementById('org-logo-name').textContent=f.name;" />
               </label>
@@ -440,15 +391,15 @@
             <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1.5rem;">
               <div>
                 <p style="font-size:.72rem;color:#475569;margin-bottom:.2rem;">שם האירוע</p>
-                <p id="dash-event-name" style="font-size:.9rem;font-weight:700;color:#f1f5f9;font-family:'Outfit',sans-serif;">—</p>
+                <p id="dash-event-name" style="font-size:.9rem;font-weight:700;color:#F5F5F5;">—</p>
               </div>
               <div>
                 <p style="font-size:.72rem;color:#475569;margin-bottom:.2rem;">תאריך</p>
-                <p id="dash-event-date" style="font-size:.9rem;font-weight:600;color:#c4b5fd;">—</p>
+                <p id="dash-event-date" style="font-size:.9rem;font-weight:600;color:#FF3300;">—</p>
               </div>
               <div style="grid-column:1/-1;">
                 <p style="font-size:.72rem;color:#475569;margin-bottom:.2rem;">מיקום</p>
-                <p id="dash-event-location" style="font-size:.9rem;font-weight:600;color:#67e8f9;">—</p>
+                <p id="dash-event-location" style="font-size:.9rem;font-weight:600;color:#F97316;">—</p>
               </div>
             </div>
           </div>
@@ -456,11 +407,11 @@
 
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;">
           <div class="form-panel" style="padding:1rem;text-align:center;">
-            <p style="font-size:1.6rem;font-weight:800;color:#a78bfa;">0</p>
+            <p style="font-size:1.6rem;font-weight:800;color:#FF3300;">0</p>
             <p style="font-size:.72rem;color:#475569;margin-top:.2rem;">נסיעות</p>
           </div>
           <div class="form-panel" style="padding:1rem;text-align:center;">
-            <p style="font-size:1.6rem;font-weight:800;color:#67e8f9;">0</p>
+            <p style="font-size:1.6rem;font-weight:800;color:#34D399;">0</p>
             <p style="font-size:.72rem;color:#475569;margin-top:.2rem;">משתתפים</p>
           </div>
           <div class="form-panel" style="padding:1rem;text-align:center;">
@@ -479,12 +430,56 @@
 
 
     <!-- ══════════════════════════════════════════
+         STEP 3.5 — My Events (returning user)
+    ══════════════════════════════════════════ -->
+    <div data-step="my-events" style="display:none;">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;">
+        <div style="display:flex;align-items:center;gap:.875rem;">
+          <div id="me-avatar" style="width:46px;height:46px;border-radius:50%;background:#F97316;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.9rem;font-weight:800;flex-shrink:0;overflow:hidden;box-shadow:0 0 0 2px rgba(249,115,22,.4);"></div>
+          <div>
+            <p id="me-greeting" style="font-size:1.1rem;font-weight:800;color:#F5F5F5;">ברוך שובך!</p>
+            <p style="font-size:.75rem;color:#475569;margin-top:.1rem;">בחר אירוע או הוסף חדש</p>
+          </div>
+        </div>
+        <button onclick="handleLogoutIndex()"
+          style="display:flex;align-items:center;gap:.4rem;font-size:.75rem;color:#475569;background:none;border:none;cursor:pointer;font-family:inherit;padding:.3rem .6rem;border-radius:.5rem;transition:color .2s;"
+          onmouseover="this.style.color='#fb7185'" onmouseout="this.style.color='#475569'">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          התנתק
+        </button>
+      </div>
+
+      <div style="margin-bottom:1rem;">
+        <p style="font-size:.78rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;">האירועים שלך</p>
+      </div>
+
+      <div id="my-events-list" style="display:flex;flex-direction:column;gap:.7rem;margin-bottom:1rem;"></div>
+
+      <!-- Add new event card -->
+      <button onclick="addNewEvent()"
+        style="width:100%;display:flex;align-items:center;gap:.875rem;background:rgba(255,51,0,.05);border:1.5px dashed rgba(255,51,0,.3);border-radius:.9rem;padding:.85rem 1rem;cursor:pointer;font-family:inherit;transition:border-color .2s,background .2s;"
+        onmouseover="this.style.borderColor='rgba(255,51,0,.6)';this.style.background='rgba(255,51,0,.08)'"
+        onmouseout="this.style.borderColor='rgba(255,51,0,.3)';this.style.background='rgba(255,51,0,.05)'">
+        <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+        <div style="text-align:right;">
+          <p style="font-size:.9rem;font-weight:700;color:#FF3300;">הוסף אירוע חדש</p>
+          <p style="font-size:.72rem;color:#666666;margin-top:.1rem;">העלה כרטיס לאירוע נוסף</p>
+        </div>
+      </button>
+
+    </div>
+
+
+    <!-- ══════════════════════════════════════════
          STEP 4 — User login
     ══════════════════════════════════════════ -->
     <div data-step="user-login" style="display:none;">
       <button onclick="show('landing')"
         style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#475569;background:none;border:none;cursor:pointer;font-family:inherit;margin-bottom:2rem;padding:0;transition:color .2s;"
-        onmouseover="this.style.color='#a78bfa'" onmouseout="this.style.color='#475569'">
+        onmouseover="this.style.color='#FF6655'" onmouseout="this.style.color='#475569'">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         חזרה
       </button>
@@ -493,7 +488,7 @@
       <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:2rem;">
         <div class="step-active">1</div>
         <span style="font-size:.8rem;font-weight:600;color:#e2e8f0;">חבר חשבון</span>
-        <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(124,58,237,.4),rgba(255,255,255,.05));"></div>
+        <div style="flex:1;height:1px;background:var(--border);"></div>
         <span style="font-size:.8rem;color:#475569;">העלה כרטיס</span>
         <div class="step-idle">2</div>
       </div>
@@ -506,7 +501,7 @@
       <div class="form-panel" style="padding:2rem;display:flex;flex-direction:column;gap:.875rem;">
 
         <!-- Google -->
-        <a href="/api/auth/google" class="btn-google">
+        <a href="#" onclick="startOAuth(event)" class="btn-google">
           <svg width="20" height="20" viewBox="0 0 24 24" style="flex-shrink:0;">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -526,7 +521,7 @@
     <div data-step="user-upload" style="display:none;">
       <button onclick="show('user-login')"
         style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#475569;background:none;border:none;cursor:pointer;font-family:inherit;margin-bottom:2rem;padding:0;transition:color .2s;"
-        onmouseover="this.style.color='#a78bfa'" onmouseout="this.style.color='#475569'">
+        onmouseover="this.style.color='#FF6655'" onmouseout="this.style.color='#475569'">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         חזרה
       </button>
@@ -535,7 +530,7 @@
       <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:2rem;">
         <div class="step-done">✓</div>
         <span style="font-size:.8rem;color:#64748b;">חבר חשבון</span>
-        <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(124,58,237,.5),rgba(34,211,238,.3));"></div>
+        <div style="flex:1;height:1px;background:var(--border);"></div>
         <span style="font-size:.8rem;font-weight:600;color:#e2e8f0;">העלה כרטיס</span>
         <div class="step-active">2</div>
       </div>
@@ -548,7 +543,7 @@
       <!-- User pill -->
       <div class="form-panel" style="padding:1rem 1.25rem;display:flex;align-items:center;gap:.875rem;margin-bottom:1.25rem;">
         <div id="user-pill-avatar"
-          style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#22d3ee);display:flex;align-items:center;justify-content:center;color:#fff;font-size:.85rem;font-weight:700;flex-shrink:0;overflow:hidden;box-shadow:0 0 0 2px rgba(124,58,237,.3);">G</div>
+          style="width:42px;height:42px;border-radius:50%;background:#F97316;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.85rem;font-weight:800;flex-shrink:0;overflow:hidden;box-shadow:0 0 0 2px rgba(249,115,22,.3);">G</div>
         <div>
           <p id="user-pill-name" style="font-size:.9rem;font-weight:600;color:#f1f5f9;">מחובר</p>
           <p style="font-size:.72rem;color:#475569;display:flex;align-items:center;gap:.4rem;margin-top:.15rem;">
@@ -563,18 +558,17 @@
         <!-- Upload -->
         <div class="form-panel" style="padding:1.5rem;">
           <div class="section-label">העלאת כרטיס</div>
-          <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed rgba(124,58,237,.25);border-radius:.875rem;padding:2.5rem 1rem;cursor:pointer;transition:border-color .2s,background .2s;"
-            onmouseover="this.style.borderColor='rgba(34,211,238,.4)';this.style.background='rgba(124,58,237,.04)'"
-            onmouseout="this.style.borderColor='rgba(124,58,237,.25)';this.style.background=''">
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="url(#up-lg)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:.875rem;">
+          <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed rgba(255,51,0,.25);border-radius:.875rem;padding:2.5rem 1rem;cursor:pointer;transition:border-color .2s,background .2s;"
+            onmouseover="this.style.borderColor='rgba(255,51,0,.5)';this.style.background='rgba(255,51,0,.04)'"
+            onmouseout="this.style.borderColor='rgba(255,51,0,.25)';this.style.background=''">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:.875rem;opacity:.7;">
               <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-              <defs><linearGradient id="up-lg" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse"><stop stop-color="#a78bfa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
             </svg>
             <p style="font-size:.875rem;font-weight:600;color:#94a3b8;">העלה screenshot של הכרטיס</p>
             <p style="font-size:.75rem;color:#475569;margin-top:.25rem;">PNG / JPG / WEBP · עד 10 MB</p>
             <input id="ticket-file" type="file" accept="image/*" style="display:none;" onchange="onFileSelect(this)" />
           </label>
-          <div id="file-preview" style="display:none;margin-top:.75rem;display:none;align-items:center;gap:.75rem;background:rgba(0,0,0,.3);border:1px solid rgba(34,211,238,.2);border-radius:.75rem;padding:.7rem 1rem;">
+          <div id="file-preview" style="display:none;margin-top:.75rem;display:none;align-items:center;gap:.75rem;background:rgba(0,0,0,.3);border:1px solid rgba(255,51,0,.2);border-radius:.75rem;padding:.7rem 1rem;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             <span id="file-name" style="font-size:.82rem;color:#94a3b8;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
             <span style="font-size:.72rem;color:#4ade80;font-weight:600;flex-shrink:0;">מוכן</span>
@@ -612,28 +606,110 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // ── אחרי Google OAuth ────────────────────────
-    (async function handleOAuthReturn() {
-      const params = new URLSearchParams(window.location.search);
-      if (!params.get('name')) return;
-
-      sessionStorage.setItem('username', params.get('name'));
-      sessionStorage.setItem('picture',  params.get('picture'));
-      sessionStorage.setItem('email',    params.get('email'));
-      window.history.replaceState({}, '', '/');
-
-      const name    = params.get('name');
-      const picture = params.get('picture');
-      const pill    = document.getElementById('user-pill-name');
-      const avatar  = document.getElementById('user-pill-avatar');
-      if (pill) pill.textContent = name;
-      if (avatar && picture) {
-        avatar.innerHTML = `<img src="${picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" referrerpolicy="no-referrer" />`;
+    function prefillUploadStep(me) {
+      const pill   = document.getElementById('user-pill-name');
+      const avatar = document.getElementById('user-pill-avatar');
+      if (pill) pill.textContent = me.name;
+      if (avatar && me.picture) {
+        avatar.innerHTML = `<img src="${me.picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" referrerpolicy="no-referrer" />`;
         avatar.style.background = 'transparent';
       }
+      sessionStorage.setItem('username', me.name);
+      sessionStorage.setItem('picture',  me.picture || '');
+      sessionStorage.setItem('email',    me.email   || '');
+    }
 
+    function renderMyEventsStep(me, events) {
+      const avatar   = document.getElementById('me-avatar');
+      const greeting = document.getElementById('me-greeting');
+      greeting.textContent = `ברוך שובך, ${me.name.split(' ')[0]}!`;
+      if (me.picture) {
+        avatar.innerHTML = `<img src="${me.picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" referrerpolicy="no-referrer" />`;
+        avatar.style.background = 'transparent';
+      } else {
+        avatar.textContent = me.name.charAt(0).toUpperCase();
+      }
+
+      const list = document.getElementById('my-events-list');
+      list.innerHTML = events.map((ue, i) => `
+        <button onclick="enterEvent(${ue.event_id})"
+          style="width:100%;display:flex;align-items:center;gap:.875rem;background:#141414;border:1.5px solid #252525;border-radius:.9rem;padding:.85rem 1rem;cursor:pointer;font-family:inherit;text-align:right;transition:border-color .2s;animation:fadeUp .4s ease-out ${i*0.07}s both;"
+          onmouseover="this.style.borderColor='#FF3300'"
+          onmouseout="this.style.borderColor='#252525'">
+          <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.28);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <p style="font-size:.9rem;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(ue.event.name)}</p>
+            ${ue.event.date ? `<p style="font-size:.72rem;color:#64748b;margin-top:.1rem;">${ue.event.date}</p>` : ''}
+          </div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </button>`).join('');
+
+      prefillUploadStep(me);
+      show('my-events');
+    }
+
+    function escHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function enterEvent(eventId) {
+      sessionStorage.setItem('eventId', eventId);
+      window.location.href = '/board';
+    }
+
+    async function addNewEvent() {
       await loadEvents();
       show('user-upload');
+    }
+
+    async function handleLogoutIndex() {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      sessionStorage.clear();
+      show('landing');
+    }
+
+    async function handleAttendeeClick() {
+      try {
+        const meRes = await fetch('/api/me');
+        if (!meRes.ok) { show('user-login'); return; }
+        const me = await meRes.json();
+
+        const evRes = await fetch('/api/me/events');
+        const myEvents = evRes.ok ? await evRes.json() : [];
+
+        if (myEvents.length > 0) {
+          renderMyEventsStep(me, myEvents);
+        } else {
+          prefillUploadStep(me);
+          await loadEvents();
+          show('user-upload');
+        }
+      } catch {
+        show('user-login');
+      }
+    }
+
+    function startOAuth(e) {
+      e.preventDefault();
+      sessionStorage.setItem('awaitingOAuth', '1');
+      window.location.href = '/api/auth/google';
+    }
+
+    (async function handleOAuthReturn() {
+      if (!sessionStorage.getItem('awaitingOAuth')) return;
+      sessionStorage.removeItem('awaitingOAuth');
+
+      try {
+        const me = await fetch('/api/me').then(r => r.ok ? r.json() : null);
+        if (!me) { show('user-login'); return; }
+        prefillUploadStep(me);
+        await loadEvents();
+        show('user-upload');
+      } catch {
+        show('user-login');
+      }
     })();
 
     async function submitOrganizer(e) {
@@ -709,14 +785,14 @@
         container.innerHTML = events.map((ev, i) => `
           <div class="event-card" data-event-id="${ev.id}" style="animation-delay:${i * 0.08}s;">
             <div class="event-bolt">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             </div>
             <div style="flex:1;min-width:0;">
               <div style="font-size:.9rem;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ev.name}</div>
               ${ev.date ? `<div style="font-size:.72rem;color:#64748b;margin-top:.15rem;">${ev.date}</div>` : ''}
             </div>
             <div class="check-badge">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
           </div>`).join('');
         container.querySelectorAll('.event-card').forEach(card => {
@@ -772,6 +848,94 @@
         btn.textContent = 'אמת כרטיס וכנס ללוח הנסיעות ←';
       }
     }
+  </script>
+
+  <!-- ══════════ SYNTHWAVE PERSPECTIVE GRID ══════════ -->
+  <script>
+    (function () {
+      const canvas = document.getElementById('grid-canvas');
+      const ctx    = canvas.getContext('2d');
+
+      let W, H, offset = 0;
+      const FIRE   = '#FF3300';
+      const H_LINES = 16;
+      const V_LINES = 20;
+      const SPEED   = 0.55;
+
+      function resize() {
+        W = canvas.width  = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      function drawGrid() {
+        ctx.clearRect(0, 0, W, H);
+
+        const vp      = { x: W / 2, y: H * 0.38 };
+        const bottom  = H + 40;
+        const spacing = (bottom - vp.y) / H_LINES;
+        const animated = offset % spacing;
+
+        ctx.shadowColor = FIRE;
+        ctx.shadowBlur  = 10;
+
+        /* Horizontal lines — animate toward viewer */
+        for (let i = 0; i <= H_LINES + 1; i++) {
+          const y = vp.y + i * spacing - animated;
+          if (y < vp.y) continue;
+          const t     = (y - vp.y) / (bottom - vp.y);
+          const alpha = t * 0.52;
+          const xL    = vp.x + (0 - vp.x) * (1 - t);
+          const xR    = vp.x + (W - vp.x) * (1 - t);
+          ctx.beginPath();
+          ctx.moveTo(xL, y);
+          ctx.lineTo(xR, y);
+          ctx.strokeStyle = `rgba(255,51,0,${alpha})`;
+          ctx.lineWidth   = t * 1.5;
+          ctx.stroke();
+        }
+
+        /* Vertical lines — fan from vanishing point */
+        for (let i = 0; i <= V_LINES; i++) {
+          const t      = i / V_LINES;
+          const xB     = W * t;
+          const alpha  = 0.05 + Math.abs(t - 0.5) * 0.28;
+          ctx.beginPath();
+          ctx.moveTo(vp.x, vp.y);
+          ctx.lineTo(xB, bottom);
+          ctx.strokeStyle = `rgba(255,51,0,${alpha})`;
+          ctx.lineWidth   = 0.8;
+          ctx.stroke();
+        }
+
+        ctx.shadowBlur = 0;
+        offset += SPEED;
+      }
+
+      function animate() {
+        drawGrid();
+        requestAnimationFrame(animate);
+      }
+      requestAnimationFrame(animate);
+
+      /* 3D tilt on role cards */
+      document.querySelectorAll('.role-card').forEach(card => {
+        card.addEventListener('mousemove', e => {
+          const rect = card.getBoundingClientRect();
+          const cx   = (e.clientX - rect.left) / rect.width  - 0.5;
+          const cy   = (e.clientY - rect.top)  / rect.height - 0.5;
+          card.style.transform = `translateY(-6px) perspective(900px) rotateX(${-cy*10}deg) rotateY(${cx*10}deg)`;
+        });
+        card.addEventListener('mouseleave', () => {
+          card.style.transform = '';
+          card.style.transition = 'transform .35s ease';
+        });
+        card.addEventListener('mouseenter', () => {
+          card.style.transition = 'transform .1s ease';
+        });
+      });
+    })();
   </script>
 
 </body>
