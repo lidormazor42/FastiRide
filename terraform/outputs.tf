@@ -35,3 +35,8 @@ output "backend_irsa_role_arn" {
   description = "Paste this into k8s/overlays/dev/serviceaccount-patch.yaml"
   value       = module.eks.backend_irsa_role_arn
 }
+
+output "lbc_role_arn" {
+  description = "IAM role ARN for AWS Load Balancer Controller"
+  value       = module.eks.lbc_role_arn
+}
