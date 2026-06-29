@@ -14,7 +14,7 @@ A production-grade ride-sharing platform for festival attendees, built as a DevO
 | IaC | Terraform |
 | CI | GitHub Actions |
 | CD | ArgoCD (GitOps) |
-| Monitoring | Prometheus + Grafana + ELK |
+| Monitoring | Prometheus + Grafana + Loki |
 
 ## Architecture
 
@@ -23,7 +23,7 @@ A production-grade ride-sharing platform for festival attendees, built as a DevO
 | | Dev | Prod |
 |---|---|---|
 | Region | us-east-1 | us-east-1 |
-| Availability Zones | 1 (us-east-1a) | 3 (1a / 1b / 1c) |
+| Availability Zones | 2 (us-east-1a, us-east-1b) | 2 (us-east-1a, us-east-1b) |
 | NAT Strategy | NAT Instance (t3.micro) | NAT Instance x2 (t3.small) |
 | Database | PostgreSQL StatefulSet | PostgreSQL StatefulSet (Primary + Replica) |
 | Load Balancer | NodePort | AWS ALB (Multi-AZ) |
@@ -49,7 +49,7 @@ FastiRide/
 ├── terraform/        # IaC — VPC, ECR, EKS modules
 ├── k8s/              # Kubernetes manifests (base + overlays)
 ├── helm/             # Helm charts
-├── monitoring/       # Prometheus, Grafana, ELK configs
+├── monitoring/       # Prometheus, Grafana, Loki configs
 └── .github/workflows # CI/CD pipelines
 ```
 
