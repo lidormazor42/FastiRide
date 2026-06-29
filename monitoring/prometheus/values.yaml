@@ -1,0 +1,38 @@
+# kube-prometheus-stack — install with:
+# helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+# helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
+#   -n monitoring --create-namespace -f monitoring/prometheus/values.yaml
+
+grafana:
+  enabled: false   # deployed separately (see monitoring/grafana/values.yaml)
+  adminPassword: CHANGE_ME
+
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp2
+          resources:
+            requests:
+              storage: 20Gi
+    # Scrape FastiRide backend metrics (if /metrics endpoint is added)
+    additionalScrapeConfigs:
+      - job_name: fastiride-backend
+        static_configs:
+          - targets: ["backend.fastiride.svc.cluster.local:8000"]
+
+alertmanager:
+  enabled: true
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      receiver: "null"   # configure Slack/PagerDuty here for prod
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true

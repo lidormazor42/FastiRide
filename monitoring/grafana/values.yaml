@@ -1,0 +1,47 @@
+# Grafana — install with:
+# helm repo add grafana https://grafana.github.io/helm-charts
+# helm upgrade --install grafana grafana/grafana \
+#   -n monitoring --create-namespace -f monitoring/grafana/values.yaml
+
+adminPassword: CHANGE_ME
+
+persistence:
+  enabled: true
+  storageClassName: gp2
+  size: 5Gi
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+        isDefault: true
+      - name: Loki
+        type: loki
+        url: http://loki.monitoring.svc.cluster.local:3100
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: default
+        folder: FastiRide
+        type: file
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+dashboards:
+  default:
+    kubernetes-cluster:
+      gnetId: 7249    # Kubernetes Cluster Overview (from grafana.com)
+      revision: 1
+      datasource: Prometheus
+    fastapi-metrics:
+      gnetId: 14927   # FastAPI Observability
+      revision: 1
+      datasource: Prometheus
+
+service:
+  type: ClusterIP   # access via kubectl port-forward or ingress
