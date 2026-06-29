@@ -1,0 +1,48 @@
+# Default values — override with values-dev.yaml or values-prod.yaml
+
+backend:
+  image:
+    repository: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/fastiride-dev-backend
+    tag: latest
+    pullPolicy: Always
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+  irsa:
+    roleArn: ""   # set in values-dev/prod.yaml after terraform apply
+
+frontend:
+  image:
+    repository: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/fastiride-dev-frontend
+    tag: latest
+    pullPolicy: Always
+  replicas: 2
+  resources:
+    requests: { cpu: 50m,  memory: 64Mi }
+    limits:   { cpu: 200m, memory: 128Mi }
+
+postgres:
+  image: postgres:16-alpine
+  storage: 10Gi
+  storageClass: gp2
+  password: CHANGE_ME
+
+ingress:
+  host: fastiride.example.com
+  tlsEnabled: true
+
+config:
+  googleRedirectUri: https://fastiride.example.com/api/auth/google/callback
+  sesSenderEmail: noreply@fastiride.example.com
+
+hpa:
+  enabled: false
+  backend:
+    minReplicas: 2
+    maxReplicas: 6
+    cpuTarget: 70
+  frontend:
+    minReplicas: 2
+    maxReplicas: 4
+    cpuTarget: 70

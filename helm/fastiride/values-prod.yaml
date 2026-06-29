@@ -1,0 +1,16 @@
+backend:
+  replicas: 2
+  irsa:
+    roleArn: ""   # paste: terraform output backend_irsa_role_arn
+
+frontend:
+  replicas: 2
+
+postgres:
+  storage: 50Gi
+
+ingress:
+  host: fastiride.example.com
+
+hpa:
+  enabled: true
