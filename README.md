@@ -16,6 +16,30 @@ A production-grade ride-sharing platform for festival attendees, built as a DevO
 | CD | ArgoCD (GitOps) |
 | Monitoring | Prometheus + Grafana + ELK |
 
+## Architecture
+
+### Environments
+
+| | Dev | Prod |
+|---|---|---|
+| Region | us-east-1 | us-east-1 |
+| Availability Zones | 1 (us-east-1a) | 3 (1a / 1b / 1c) |
+| NAT Strategy | NAT Instance (t3.micro) | NAT Instance x2 (t3.small) |
+| Database | PostgreSQL StatefulSet | PostgreSQL StatefulSet (Primary + Replica) |
+| Load Balancer | NodePort | AWS ALB (Multi-AZ) |
+
+### FinOps Decision Log
+
+**NAT Instance over NAT Gateway:** Both environments use EC2-based NAT Instances
+instead of AWS-managed NAT Gateways. This saves ~$32–64/month per environment.
+Trade-off: requires manual patching and CloudWatch-based health monitoring.
+Migration path to NAT Gateway is a single Terraform variable change if throughput
+requirements exceed instance limits.
+
+**PostgreSQL in-cluster:** Using a StatefulSet instead of RDS saves ~$100–150/month
+in dev and prod. Acceptable for a capstone project; production business workloads
+should evaluate RDS Multi-AZ for automated failover SLA.
+
 ## Project Structure
 
 ```
@@ -45,17 +69,23 @@ FastiRide/
 # Initialize Terraform
 cd terraform
 terraform init
+```
 
-# Preview infrastructure
+#### Deploy Dev Environment
+
+```bash
 terraform plan -var-file="dev.tfvars"
-
-# Apply (creates VPC, ECR, EKS)
 terraform apply -var-file="dev.tfvars"
+aws eks update-kubeconfig --region us-east-1 --name fastiride-dev
+kubectl get nodes
+```
 
-# Connect kubectl to the cluster
-aws eks update-kubeconfig --region eu-central-1 --name fastiride-dev
+#### Deploy Prod Environment
 
-# Verify nodes are ready
+```bash
+terraform plan -var-file="prod.tfvars"
+terraform apply -var-file="prod.tfvars"
+aws eks update-kubeconfig --region us-east-1 --name fastiride-prod
 kubectl get nodes
 ```
 
