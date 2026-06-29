@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fastiride-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io   # cleans up K8s resources on app delete
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/YOUR_GITHUB_USERNAME/FastiRide
+    targetRevision: HEAD
+    path: k8s/overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fastiride
+  syncPolicy:
+    automated:
+      prune: true      # remove resources deleted from Git
+      selfHeal: true   # revert manual kubectl changes
+    syncOptions:
+      - CreateNamespace=true
