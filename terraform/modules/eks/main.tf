@@ -1,4 +1,4 @@
-# ─── IAM Role: EKS Cluster ───────────────────────────────────────────────────
+# ── IAM: Cluster role ────────────────────────────────────────────────────────
 resource "aws_iam_role" "cluster" {
   name = "fastiride-${var.environment}-eks-cluster-role"
 
@@ -10,11 +10,6 @@ resource "aws_iam_role" "cluster" {
       Principal = { Service = "eks.amazonaws.com" }
     }]
   })
-
-  tags = {
-    Name        = "fastiride-${var.environment}-eks-cluster-role"
-    Environment = var.environment
-  }
 }
 
 resource "aws_iam_role_policy_attachment" "cluster_policy" {
@@ -22,25 +17,33 @@ resource "aws_iam_role_policy_attachment" "cluster_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
 
-# ─── EKS Cluster ─────────────────────────────────────────────────────────────
+# ── EKS Cluster ───────────────────────────────────────────────────────────────
 resource "aws_eks_cluster" "main" {
   name     = "fastiride-${var.environment}"
   role_arn = aws_iam_role.cluster.arn
   version  = var.kubernetes_version
 
   vpc_config {
-    subnet_ids = var.subnet_ids
+    subnet_ids              = var.subnet_ids
+    endpoint_private_access = true
+    endpoint_public_access  = true   # set false in prod after VPN/bastion is ready
   }
 
   depends_on = [aws_iam_role_policy_attachment.cluster_policy]
-
-  tags = {
-    Name        = "fastiride-${var.environment}"
-    Environment = var.environment
-  }
 }
 
-# ─── IAM Role: Node Group ─────────────────────────────────────────────────────
+# ── OIDC Provider — enables IRSA (pod-level AWS permissions, no static keys) ─
+data "tls_certificate" "eks" {
+  url = aws_eks_cluster.main.identity[0].oidc[0].issuer
+}
+
+resource "aws_iam_openid_connect_provider" "eks" {
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.eks.certificates[0].sha1_fingerprint]
+  url             = aws_eks_cluster.main.identity[0].oidc[0].issuer
+}
+
+# ── IAM: Node group role ──────────────────────────────────────────────────────
 resource "aws_iam_role" "nodes" {
   name = "fastiride-${var.environment}-eks-node-role"
 
@@ -52,29 +55,24 @@ resource "aws_iam_role" "nodes" {
       Principal = { Service = "ec2.amazonaws.com" }
     }]
   })
-
-  tags = {
-    Name        = "fastiride-${var.environment}-eks-node-role"
-    Environment = var.environment
-  }
 }
 
-resource "aws_iam_role_policy_attachment" "nodes_worker_policy" {
+resource "aws_iam_role_policy_attachment" "nodes_worker" {
   role       = aws_iam_role.nodes.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
 }
 
-resource "aws_iam_role_policy_attachment" "nodes_cni_policy" {
+resource "aws_iam_role_policy_attachment" "nodes_cni" {
   role       = aws_iam_role.nodes.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
 }
 
-resource "aws_iam_role_policy_attachment" "nodes_ecr_policy" {
+resource "aws_iam_role_policy_attachment" "nodes_ecr" {
   role       = aws_iam_role.nodes.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
-# ─── Node Group ───────────────────────────────────────────────────────────────
+# ── Node Group (private subnets) ──────────────────────────────────────────────
 resource "aws_eks_node_group" "main" {
   cluster_name    = aws_eks_cluster.main.name
   node_group_name = "fastiride-${var.environment}-nodes"
@@ -88,14 +86,54 @@ resource "aws_eks_node_group" "main" {
     max_size     = var.node_max_size
   }
 
-  depends_on = [
-    aws_iam_role_policy_attachment.nodes_worker_policy,
-    aws_iam_role_policy_attachment.nodes_cni_policy,
-    aws_iam_role_policy_attachment.nodes_ecr_policy,
-  ]
-
-  tags = {
-    Name        = "fastiride-${var.environment}-nodes"
-    Environment = var.environment
+  update_config {
+    max_unavailable = 1
   }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.nodes_worker,
+    aws_iam_role_policy_attachment.nodes_cni,
+    aws_iam_role_policy_attachment.nodes_ecr,
+  ]
+}
+
+# ── IRSA: Backend service account — sends emails via SES ─────────────────────
+# Pods annotated with this role get a short-lived token; no AWS keys in secrets.
+locals {
+  oidc_issuer = replace(aws_iam_openid_connect_provider.eks.url, "https://", "")
+}
+
+resource "aws_iam_role" "backend_irsa" {
+  name = "fastiride-${var.environment}-backend-irsa"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      }
+      Condition = {
+        StringEquals = {
+          "${local.oidc_issuer}:sub" = "system:serviceaccount:fastiride:backend"
+          "${local.oidc_issuer}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "backend_ses" {
+  name = "ses-send"
+  role = aws_iam_role.backend_irsa.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ses:SendEmail", "ses:SendRawEmail"]
+      Resource = "*"
+    }]
+  })
 }

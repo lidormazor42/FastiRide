@@ -1,29 +1,37 @@
 output "vpc_id" {
-  description = "The ID of the FastiRide VPC"
-  value       = module.vpc.vpc_id
+  value = module.vpc.vpc_id
 }
 
 output "public_subnet_ids" {
-  description = "IDs of the public subnets"
-  value       = module.vpc.public_subnet_ids
+  value = module.vpc.public_subnet_ids
 }
 
-output "backend_repository_url" {
-  description = "ECR URL for the backend image"
-  value       = module.ecr.backend_repository_url
+output "private_subnet_ids" {
+  value = module.vpc.private_subnet_ids
 }
 
-output "frontend_repository_url" {
-  description = "ECR URL for the frontend image"
-  value       = module.ecr.frontend_repository_url
+output "nat_instance_id" {
+  description = "NAT Instance (t3.micro) — replaces NAT Gateway, saves ~$32/month"
+  value       = module.vpc.nat_instance_id
+}
+
+output "backend_ecr_url" {
+  value = module.ecr.backend_repository_url
+}
+
+output "frontend_ecr_url" {
+  value = module.ecr.frontend_repository_url
 }
 
 output "eks_cluster_name" {
-  description = "Name of the EKS cluster"
-  value       = module.eks.cluster_name
+  value = module.eks.cluster_name
 }
 
 output "eks_cluster_endpoint" {
-  description = "API endpoint of the EKS cluster"
-  value       = module.eks.cluster_endpoint
+  value = module.eks.cluster_endpoint
+}
+
+output "backend_irsa_role_arn" {
+  description = "Paste this into k8s/overlays/dev/serviceaccount-patch.yaml"
+  value       = module.eks.backend_irsa_role_arn
 }
