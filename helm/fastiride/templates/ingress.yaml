@@ -2,17 +2,17 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: fastiride
-  namespace: fastiride
+  namespace: {{ .Release.Namespace }}
   annotations:
-    kubernetes.io/ingress.class: "alb"
     alb.ingress.kubernetes.io/scheme: "internet-facing"
     alb.ingress.kubernetes.io/target-type: "ip"
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
     alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:439594592108:certificate/c2fd86e1-e512-4d2f-8ec2-8f1d175f1cdd"
 spec:
+  ingressClassName: alb
   rules:
-    - host: {{ .Values.ingress.host }}
-      http:
+    - http:
         paths:
           - path: /api
             pathType: Prefix

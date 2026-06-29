@@ -1,7 +1,7 @@
 backend:
   replicas: 1
   irsa:
-    roleArn: ""   # paste: terraform output backend_irsa_role_arn
+    roleArn: "arn:aws:iam::439594592108:role/fastiride-dev-backend-irsa"
 
 frontend:
   replicas: 1

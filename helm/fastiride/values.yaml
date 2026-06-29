@@ -2,7 +2,7 @@
 
 backend:
   image:
-    repository: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/fastiride-dev-backend
+    repository: 439594592108.dkr.ecr.us-east-1.amazonaws.com/fastiride-dev-backend
     tag: latest
     pullPolicy: Always
   replicas: 2
@@ -14,7 +14,7 @@ backend:
 
 frontend:
   image:
-    repository: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/fastiride-dev-frontend
+    repository: 439594592108.dkr.ecr.us-east-1.amazonaws.com/fastiride-dev-frontend
     tag: latest
     pullPolicy: Always
   replicas: 2
@@ -26,7 +26,7 @@ postgres:
   image: postgres:16-alpine
   storage: 10Gi
   storageClass: gp2
-  password: CHANGE_ME
+  password: fastiride-dev-2026
 
 ingress:
   host: fastiride.example.com
