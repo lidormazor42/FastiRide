@@ -74,3 +74,12 @@ module "github_oidc" {
     module.ecr.frontend_repository_arn,
   ]
 }
+
+# ── DNS — Route 53 hosted zone for fastiride.app ──────────────────────────────
+# Persistent: not destroyed in the daily teardown, costs ~$0.50/month flat.
+# The A record itself is updated by scripts/bootstrap-dev.sh on every deploy.
+module "dns" {
+  source = "./modules/dns"
+
+  domain_name = "fastiride.app"
+}

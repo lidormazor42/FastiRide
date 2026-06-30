@@ -10,7 +10,9 @@ echo "==> Reading Terraform outputs"
 CLUSTER_NAME=$(terraform output -raw eks_cluster_name)
 VPC_ID=$(terraform output -raw vpc_id)
 LBC_ROLE_ARN=$(terraform output -raw lbc_role_arn)
+DNS_ZONE_ID=$(terraform output -raw dns_zone_id)
 AWS_REGION="us-east-1"
+ALB_HOSTED_ZONE_ID="Z35SXDOTRQ7X7K"   # fixed AWS constant for ALBs in us-east-1
 
 echo "==> Connecting kubectl to $CLUSTER_NAME"
 aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
@@ -53,5 +55,38 @@ helm upgrade --install fastiride helm/fastiride \
   --namespace fastiride-dev \
   --wait
 
-echo "==> Done. Ingress address (DNS already points fastiride.app here):"
-kubectl get ingress -n fastiride-dev
+echo "==> Waiting for ALB hostname to be assigned"
+ALB_HOSTNAME=""
+for i in $(seq 1 30); do
+  ALB_HOSTNAME=$(kubectl get ingress fastiride -n fastiride-dev -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+  [ -n "$ALB_HOSTNAME" ] && break
+  sleep 5
+done
+
+if [ -z "$ALB_HOSTNAME" ]; then
+  echo "    ALB hostname not ready yet — check 'kubectl get ingress -n fastiride-dev' manually and update DNS."
+  exit 1
+fi
+
+echo "==> Pointing fastiride.app at $ALB_HOSTNAME"
+cat > /tmp/dns-upsert.json <<EOF
+{
+  "Changes": [{
+    "Action": "UPSERT",
+    "ResourceRecordSet": {
+      "Name": "fastiride.app",
+      "Type": "A",
+      "AliasTarget": {
+        "HostedZoneId": "$ALB_HOSTED_ZONE_ID",
+        "DNSName": "$ALB_HOSTNAME",
+        "EvaluateTargetHealth": true
+      }
+    }
+  }]
+}
+EOF
+aws route53 change-resource-record-sets \
+  --hosted-zone-id "$DNS_ZONE_ID" \
+  --change-batch file:///tmp/dns-upsert.json
+
+echo "==> Done. fastiride.app now points at $ALB_HOSTNAME"

@@ -45,3 +45,13 @@ output "github_actions_role_arn" {
   description = "IAM role ARN GitHub Actions assumes via OIDC to push to ECR"
   value       = module.github_oidc.role_arn
 }
+
+output "dns_zone_id" {
+  description = "Route 53 hosted zone ID for fastiride.app"
+  value       = module.dns.zone_id
+}
+
+output "dns_name_servers" {
+  description = "Paste these into Name.com to delegate fastiride.app to Route 53"
+  value       = module.dns.name_servers
+}

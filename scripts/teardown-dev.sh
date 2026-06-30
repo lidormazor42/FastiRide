@@ -12,10 +12,10 @@ helm uninstall fastiride -n fastiride-dev 2>/dev/null || echo "    (already remo
 echo "==> Waiting 30s for the ALB and its security groups to fully delete"
 sleep 30
 
-echo "==> Running terraform destroy (VPC + EKS only — ECR and GitHub OIDC role stay alive, they cost ~\$0)"
+echo "==> Running terraform destroy (VPC + EKS only — ECR, GitHub OIDC role, and DNS zone stay alive, they cost ~\$0.50/month total)"
 terraform destroy -var-file="dev.tfvars" -target=module.vpc -target=module.eks
 
-echo "==> Verifying no compute is left running (ECR + GitHub OIDC role are expected to remain)"
+echo "==> Verifying no compute is left running (ECR, GitHub OIDC role, and DNS zone are expected to remain)"
 terraform state list
 
 echo "==> Done. Check AWS directly if you want extra confidence:"
