@@ -61,3 +61,16 @@ module "eks" {
   node_min_size       = var.node_min_size
   node_max_size       = var.node_max_size
 }
+
+# ── GitHub OIDC — lets GitHub Actions push to ECR without static AWS keys ─────
+module "github_oidc" {
+  source = "./modules/github-oidc"
+
+  environment = var.environment
+  github_org  = "lidormazor42"
+  github_repo = "FastiRide"
+  ecr_repository_arns = [
+    module.ecr.backend_repository_arn,
+    module.ecr.frontend_repository_arn,
+  ]
+}

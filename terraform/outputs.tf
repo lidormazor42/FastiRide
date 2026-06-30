@@ -32,11 +32,16 @@ output "eks_cluster_endpoint" {
 }
 
 output "backend_irsa_role_arn" {
-  description = "Paste this into k8s/overlays/dev/serviceaccount-patch.yaml"
+  description = "Paste this into helm/fastiride/values-dev.yaml under backend.irsa.roleArn"
   value       = module.eks.backend_irsa_role_arn
 }
 
 output "lbc_role_arn" {
   description = "IAM role ARN for AWS Load Balancer Controller"
   value       = module.eks.lbc_role_arn
+}
+
+output "github_actions_role_arn" {
+  description = "IAM role ARN GitHub Actions assumes via OIDC to push to ECR"
+  value       = module.github_oidc.role_arn
 }
