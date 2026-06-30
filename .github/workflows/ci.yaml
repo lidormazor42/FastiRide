@@ -6,7 +6,7 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
-      - "k8s/**"
+      - "helm/**"
   pull_request:
     branches: [main]
 
@@ -80,20 +80,20 @@ jobs:
           docker push $REGISTRY/fastiride-dev-frontend:$TAG
           docker push $REGISTRY/fastiride-dev-frontend:latest
 
-      # GitOps: update image tags in kustomization → ArgoCD picks up the change
+      - name: Install yq
+        uses: mikefarah/yq@v4
+
+      # GitOps: update image tags in Helm values → ArgoCD picks up the change
       - name: Update image tags (GitOps trigger)
         env:
-          REGISTRY: ${{ steps.ecr.outputs.registry }}
           TAG: ${{ github.sha }}
         run: |
-          cd k8s/overlays/dev
-          # kustomize edit set image rewrites the newTag field in kustomization.yaml
-          kustomize edit set image \
-            backend-image=$REGISTRY/fastiride-dev-backend:$TAG \
-            frontend-image=$REGISTRY/fastiride-dev-frontend:$TAG
+          cd helm/fastiride
+          yq -i ".backend.image.tag = \"$TAG\"" values.yaml
+          yq -i ".frontend.image.tag = \"$TAG\"" values.yaml
           git config user.email "ci@fastiride.app"
           git config user.name  "FastiRide CI"
-          git add kustomization.yaml
+          git add values.yaml
           git diff --staged --quiet || \
-            git commit -m "ci: bump images → $TAG [skip ci]"
+            git commit -m "Bump images to $TAG [skip ci]"
           git push

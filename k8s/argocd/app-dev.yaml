@@ -8,12 +8,16 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/YOUR_GITHUB_USERNAME/FastiRide
+    repoURL: https://github.com/lidormazor42/FastiRide
     targetRevision: HEAD
-    path: k8s/overlays/dev
+    path: helm/fastiride
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: fastiride
+    namespace: fastiride-dev
   syncPolicy:
     automated:
       prune: true      # remove resources deleted from Git

@@ -8,9 +8,13 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/YOUR_GITHUB_USERNAME/FastiRide
+    repoURL: https://github.com/lidormazor42/FastiRide
     targetRevision: main   # prod tracks only the stable main branch
-    path: k8s/overlays/prod
+    path: helm/fastiride
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-prod.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: fastiride-prod
