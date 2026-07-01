@@ -4,39 +4,34 @@
 backend:
   image:
     repository: 439594592108.dkr.ecr.us-east-1.amazonaws.com/fastiride-dev-backend
-    tag: latest
+    tag: 9b36e0a73e6bcee3710fb076c8b48ff4308d26fb
     pullPolicy: Always
   replicas: 2
   resources:
-    requests: { cpu: 100m, memory: 256Mi }
-    limits:   { cpu: 500m, memory: 512Mi }
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: 500m, memory: 512Mi}
   irsa:
-    roleArn: ""   # set in values-dev/prod.yaml after terraform apply
-
+    roleArn: "" # set in values-dev/prod.yaml after terraform apply
 frontend:
   image:
     repository: 439594592108.dkr.ecr.us-east-1.amazonaws.com/fastiride-dev-frontend
-    tag: latest
+    tag: 9b36e0a73e6bcee3710fb076c8b48ff4308d26fb
     pullPolicy: Always
   replicas: 2
   resources:
-    requests: { cpu: 50m,  memory: 64Mi }
-    limits:   { cpu: 200m, memory: 128Mi }
-
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {cpu: 200m, memory: 128Mi}
 postgres:
   image: postgres:16-alpine
   storage: 10Gi
   storageClass: gp2
   password: fastiride-dev-2026
-
 ingress:
   host: fastiride.example.com
   tlsEnabled: true
-
 config:
   googleRedirectUri: https://fastiride.example.com/api/auth/google/callback
   sesSenderEmail: noreply@fastiride.example.com
-
 hpa:
   enabled: false
   backend:
