@@ -30,6 +30,14 @@ helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-contro
   --set vpcId="$VPC_ID" \
   --wait
 
+echo "==> Installing ArgoCD"
+helm repo add argo https://argoproj.github.io/argo-helm >/dev/null 2>&1 || true
+helm repo update >/dev/null
+helm upgrade --install argocd argo/argo-cd \
+  --namespace argocd \
+  --create-namespace \
+  --wait
+
 echo "==> Creating fastiride-dev namespace"
 kubectl create namespace fastiride-dev --dry-run=client -o yaml | kubectl apply -f -
 
@@ -54,6 +62,9 @@ helm upgrade --install fastiride helm/fastiride \
   -f helm/fastiride/values-dev.yaml \
   --namespace fastiride-dev \
   --wait
+
+echo "==> Registering fastiride-dev Application with ArgoCD"
+kubectl apply -f k8s/argocd/app-dev.yaml
 
 echo "==> Waiting for ALB hostname to be assigned"
 ALB_HOSTNAME=""
