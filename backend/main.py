@@ -5,6 +5,7 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Coo
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
 from jose import jwt, JWTError
 import httpx
 from PIL import Image
@@ -20,7 +21,6 @@ SESSION_SECRET = os.getenv("SESSION_SECRET", "fastiride-dev-secret-change-in-pro
 Base.metadata.create_all(bind=engine)
 
 # Add new columns to existing tables without Alembic
-from sqlalchemy import text
 with engine.connect() as _conn:
     _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS driver_age INTEGER"))
     _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS driver_photo TEXT"))

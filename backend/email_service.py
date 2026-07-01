@@ -15,7 +15,7 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 
 def _send(to: str, subject: str, html: str) -> None:
     if not to:
-        print(f"[EMAIL SKIP] No recipient address — configure driver_email on the ride")
+        print("[EMAIL SKIP] No recipient address — configure driver_email on the ride")
         return
 
     # ── Option 1: SMTP (Gmail / SendGrid / Mailhog for local dev) ──
