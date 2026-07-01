@@ -1,4 +1,5 @@
 # Default values — override with values-dev.yaml or values-prod.yaml
+# ci-test: verifying OIDC pipeline
 
 backend:
   image:
