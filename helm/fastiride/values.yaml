@@ -27,11 +27,11 @@ postgres:
   storageClass: gp2
   password: fastiride-dev-2026
 ingress:
-  host: fastiride.example.com
+  host: fastiride.app
   tlsEnabled: true
 config:
-  googleRedirectUri: https://fastiride.example.com/api/auth/google/callback
-  sesSenderEmail: noreply@fastiride.example.com
+  googleRedirectUri: https://fastiride.app/api/auth/google/callback
+  sesSenderEmail: noreply@fastiride.app
 hpa:
   enabled: false
   backend:

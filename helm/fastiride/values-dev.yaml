@@ -7,10 +7,10 @@ frontend:
   replicas: 1
 
 ingress:
-  host: dev.fastiride.example.com
+  host: fastiride.app
 
 config:
-  googleRedirectUri: https://dev.fastiride.example.com/api/auth/google/callback
+  googleRedirectUri: https://fastiride.app/api/auth/google/callback
 
 hpa:
   enabled: false
