@@ -46,6 +46,11 @@ output "github_actions_role_arn" {
   value       = module.github_oidc.role_arn
 }
 
+output "ticket_uploads_bucket" {
+  description = "S3 bucket for ticket images — set as S3_UPLOADS_BUCKET on the backend"
+  value       = module.uploads.bucket_name
+}
+
 output "dns_zone_id" {
   description = "Route 53 hosted zone ID for fastiride.app"
   value       = module.dns.zone_id

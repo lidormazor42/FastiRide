@@ -23,6 +23,11 @@ output "backend_irsa_role_arn" {
   value       = aws_iam_role.backend_irsa.arn
 }
 
+output "backend_irsa_role_name" {
+  description = "Name of the backend IRSA role — other modules attach policies to it"
+  value       = aws_iam_role.backend_irsa.name
+}
+
 output "lbc_role_arn" {
   description = "ARN of the IAM role for AWS Load Balancer Controller"
   value       = aws_iam_role.lbc.arn

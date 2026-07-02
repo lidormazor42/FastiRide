@@ -32,6 +32,10 @@ ingress:
 config:
   googleRedirectUri: https://fastiride.app/api/auth/google/callback
   sesSenderEmail: noreply@fastiride.app
+  awsRegion: us-east-1
+  useRekognition: "true"
+  # Bucket created by terraform module "uploads" — name is deterministic per env
+  s3UploadsBucket: fastiride-dev-ticket-uploads
 hpa:
   enabled: false
   backend:

@@ -9,14 +9,27 @@ class TicketRequest(BaseModel):
 
 class EventCreate(BaseModel):
     name: str
-    ticket_prefix: Optional[str] = ""
+    location: Optional[str] = None
+    date: Optional[str] = None
+    logo_url: Optional[str] = None
+    owner_phone: str
+
+
+class EventUpdate(BaseModel):
+    name: Optional[str] = None
     location: Optional[str] = None
     date: Optional[str] = None
     logo_url: Optional[str] = None
 
 
-class EventOut(EventCreate):
+class EventOut(BaseModel):
     id: int
+    name: str
+    location: Optional[str] = None
+    date: Optional[str] = None
+    logo_url: Optional[str] = None
+    owner_email: Optional[str] = None
+    owner_phone: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -56,9 +69,17 @@ class UserOut(BaseModel):
     name: str
     email: str
     picture: Optional[str] = None
+    age: Optional[int] = None
+    city: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class ProfileUpdate(BaseModel):
+    age: Optional[int] = None
+    picture: Optional[str] = None
+    city: Optional[str] = None
 
 
 class UserEventOut(BaseModel):

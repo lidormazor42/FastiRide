@@ -12,6 +12,8 @@ class User(Base):
     name      = Column(String, nullable=False)
     email     = Column(String, nullable=False)
     picture   = Column(String, nullable=True)
+    age       = Column(Integer, nullable=True)
+    city      = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     validated_events = relationship("UserEvent", back_populates="user")
@@ -32,13 +34,15 @@ class UserEvent(Base):
 
 class Event(Base):
     __tablename__ = "events"
+    __table_args__ = (UniqueConstraint("name", "date"),)
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    ticket_prefix = Column(String, nullable=True, default="")
     location = Column(String, nullable=True)
     date = Column(String, nullable=True)
     logo_url = Column(String, nullable=True)
+    owner_email = Column(String, nullable=True)
+    owner_phone = Column(String, nullable=True)
 
     rides = relationship("Ride", back_populates="event")
 
@@ -74,3 +78,14 @@ class RideRequest(Base):
     created_at      = Column(DateTime, default=datetime.utcnow)
 
     ride = relationship("Ride", back_populates="requests")
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    ride_id      = Column(Integer, ForeignKey("rides.id"), nullable=False, index=True)
+    sender_name  = Column(String, nullable=False)
+    sender_email = Column(String, nullable=False)
+    text         = Column(String, nullable=False)
+    created_at   = Column(DateTime, default=datetime.utcnow)

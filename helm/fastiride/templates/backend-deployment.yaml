@@ -47,6 +47,14 @@ spec:
               value: {{ .Values.config.googleRedirectUri | quote }}
             - name: SES_SENDER_EMAIL
               value: {{ .Values.config.sesSenderEmail | quote }}
+            - name: AWS_REGION
+              value: {{ .Values.config.awsRegion | quote }}
+            - name: USE_REKOGNITION
+              value: {{ .Values.config.useRekognition | quote }}
+            {{- if .Values.config.s3UploadsBucket }}
+            - name: S3_UPLOADS_BUCKET
+              value: {{ .Values.config.s3UploadsBucket | quote }}
+            {{- end }}
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
           readinessProbe:

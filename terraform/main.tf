@@ -75,6 +75,16 @@ module "github_oidc" {
   ]
 }
 
+# ── Uploads — S3 bucket for ticket images + Rekognition access for backend ────
+# Persistent like DNS/ECR: the bucket survives the daily teardown; the IAM
+# policy piece is recreated together with the EKS IRSA role on bootstrap.
+module "uploads" {
+  source = "./modules/uploads"
+
+  environment       = var.environment
+  backend_role_name = module.eks.backend_irsa_role_name
+}
+
 # ── DNS — Route 53 hosted zone for fastiride.app ──────────────────────────────
 # Persistent: not destroyed in the daily teardown, costs ~$0.50/month flat.
 # The A record itself is updated by scripts/bootstrap-dev.sh on every deploy.

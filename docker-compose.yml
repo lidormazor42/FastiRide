@@ -27,6 +27,14 @@ services:
     environment:
       - PORT=8000
       - DATABASE_URL=postgresql://fastiride:fastiride@db:5432/fastiride
+      - AWS_REGION=us-east-1
+      - USE_REKOGNITION=true
+      # S3_UPLOADS_BUCKET is set once terraform creates the bucket:
+      # - S3_UPLOADS_BUCKET=fastiride-dev-ticket-uploads
+    volumes:
+      # Local dev only — lets boto3 use your host AWS credentials for
+      # Rekognition. In EKS this is replaced by IRSA (no keys at all).
+      - ~/.aws:/root/.aws:ro
     depends_on:
       db:
         condition: service_healthy

@@ -1,7 +1,12 @@
 import os
+import re
+import uuid
 from io import BytesIO
 from urllib.parse import urlencode
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Cookie, Response
+from fastapi import (
+    FastAPI, Depends, HTTPException, UploadFile, File, Form, Cookie, Response,
+    WebSocket, WebSocketDisconnect,
+)
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -18,6 +23,10 @@ from email_service import send_join_notification, send_cancel_notification
 
 SESSION_SECRET = os.getenv("SESSION_SECRET", "fastiride-dev-secret-change-in-prod")
 
+AWS_REGION        = os.getenv("AWS_REGION", "us-east-1")
+S3_UPLOADS_BUCKET = os.getenv("S3_UPLOADS_BUCKET", "")
+USE_REKOGNITION   = os.getenv("USE_REKOGNITION", "").lower() in ("1", "true", "yes")
+
 Base.metadata.create_all(bind=engine)
 
 # Add new columns to existing tables without Alembic
@@ -27,8 +36,20 @@ with engine.connect() as _conn:
     _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS driver_email TEXT"))
     _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS vehicle_type TEXT"))
     _conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS logo_url TEXT"))
-    _conn.execute(text("ALTER TABLE events ALTER COLUMN ticket_prefix DROP NOT NULL"))
+    # ticket_prefix never had a real source of truth (producers don't control
+    # barcode formats issued by external ticketing platforms) — dropped.
+    _conn.execute(text("ALTER TABLE events DROP COLUMN IF EXISTS ticket_prefix"))
     _conn.execute(text("ALTER TABLE ride_requests ADD COLUMN IF NOT EXISTS passenger_email TEXT"))
+    _conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS age INTEGER"))
+    _conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS city TEXT"))
+    _conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS owner_email TEXT"))
+    _conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS owner_phone TEXT"))
+    _conn.execute(text("""
+        DO $$ BEGIN
+            ALTER TABLE events ADD CONSTRAINT events_name_date_key UNIQUE (name, date);
+        EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
+        END $$;
+    """))
     _conn.commit()
 
 app = FastAPI()
@@ -126,6 +147,26 @@ def get_me(session: str = Cookie(default=None), db: Session = Depends(get_db)):
     return user
 
 
+@app.patch("/api/me", response_model=schemas.UserOut)
+def update_profile(
+    update: schemas.ProfileUpdate,
+    session: str = Cookie(default=None),
+    db: Session = Depends(get_db),
+):
+    user = _get_user_from_cookie(session, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="לא מחובר")
+    if update.age is not None:
+        user.age = update.age
+    if update.picture is not None:
+        user.picture = update.picture
+    if update.city is not None:
+        user.city = update.city
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 @app.get("/api/me/events", response_model=list[schemas.UserEventOut])
 def get_my_events(session: str = Cookie(default=None), db: Session = Depends(get_db)):
     user = _get_user_from_cookie(session, db)
@@ -140,14 +181,47 @@ def logout(response: Response):
     return {"ok": True}
 
 
-# ── Ticket validation ─────────────────────────────────────────────
-def _ticket_matches(qr_text: str, ocr_text: str, event_name: str) -> bool:
+# ── Ticket check ──────────────────────────────────────────────────
+# This is NOT ticket authentication — FastiRide doesn't sell tickets and has
+# no access to the issuing platform's (Zygo/Go-Out/etc.) real database, so
+# there's no way to check a barcode is genuine or unused. This only checks
+# that the uploaded photo *plausibly* mentions the event, as a light spam
+# filter before someone can see/post rides. Framed honestly in the UI too.
+def _ticket_matches(qr_text: str, ocr_text: str, event: models.Event) -> bool:
     combined = (qr_text + " " + ocr_text).lower()
-    words    = [w for w in event_name.split() if len(w) > 2]
+    words = [w for w in event.name.split() if len(w) > 2]
     if not words:
         return False
     matches = sum(1 for w in words if w.lower() in combined)
     return matches >= max(1, len(words) // 2)
+
+
+def _extract_text_rekognition(content: bytes) -> str:
+    """Managed OCR via AWS Rekognition — no native deps in the container.
+    Note: DetectText reads Latin script only; Hebrew-only tickets fall
+    back to the QR path (and pytesseract when Rekognition is disabled)."""
+    import boto3
+    client = boto3.client("rekognition", region_name=AWS_REGION)
+    resp = client.detect_text(Image={"Bytes": content})
+    return " ".join(
+        d["DetectedText"] for d in resp.get("TextDetections", [])
+        if d.get("Type") == "LINE"
+    )
+
+
+def _archive_ticket_to_s3(content: bytes, event_id: int) -> None:
+    if not S3_UPLOADS_BUCKET:
+        return
+    try:
+        import boto3
+        boto3.client("s3", region_name=AWS_REGION).put_object(
+            Bucket=S3_UPLOADS_BUCKET,
+            Key=f"tickets/{event_id}/{uuid.uuid4().hex}.jpg",
+            Body=content,
+            ContentType="image/jpeg",
+        )
+    except Exception as e:
+        print(f"[S3 ARCHIVE ERROR] {e}")
 
 
 @app.post("/api/validate")
@@ -164,7 +238,7 @@ async def validate(
     content = await file.read()
     image   = Image.open(BytesIO(content)).convert("RGB")
 
-    # שלב א' — סריקת QR / ברקוד
+    # שלב א' — סריקת QR / ברקוד (מקומי, מהיר, תמיד רץ)
     qr_text = ""
     try:
         decoded = qr_decode(image)
@@ -173,14 +247,23 @@ async def validate(
     except Exception:
         pass
 
-    # שלב ב' — OCR (גיבוי אם QR לא מספיק)
+    # שלב ב' — OCR: Rekognition (מנוהל) עם fallback ל-pytesseract מקומי
     ocr_text = ""
-    try:
-        ocr_text = pytesseract.image_to_string(image, lang="heb+eng")
-    except Exception:
-        pass
+    if USE_REKOGNITION:
+        try:
+            ocr_text = _extract_text_rekognition(content)
+        except Exception as e:
+            print(f"[REKOGNITION ERROR] {e} — falling back to local OCR")
+    if not ocr_text:
+        try:
+            ocr_text = pytesseract.image_to_string(image, lang="heb+eng")
+        except Exception:
+            pass
 
-    if _ticket_matches(qr_text, ocr_text, event.name):
+    # ארכיון: שמירת תמונת הכרטיס ב-S3 (אם מוגדר bucket)
+    _archive_ticket_to_s3(content, event.id)
+
+    if _ticket_matches(qr_text, ocr_text, event):
         user = _get_user_from_cookie(session, db)
         if user:
             try:
@@ -190,7 +273,7 @@ async def validate(
                 db.rollback()
         return {"valid": True, "event_name": event.name, "event_id": event.id}
 
-    return {"valid": False, "error": f"הכרטיס לא תואם לאירוע '{event.name}'"}
+    return {"valid": False, "error": f"לא זיהינו אזכור של '{event.name}' בתמונה שהעלית"}
 
 
 # ── Events ────────────────────────────────────────────────────────
@@ -200,21 +283,176 @@ def get_events(db: Session = Depends(get_db)):
 
 
 @app.post("/api/events", response_model=schemas.EventOut)
-def create_event(event: schemas.EventCreate, db: Session = Depends(get_db)):
-    db_event = models.Event(**event.model_dump())
+def create_event(
+    event: schemas.EventCreate,
+    db: Session = Depends(get_db),
+    session: str = Cookie(default=None),
+):
+    user = _get_user_from_cookie(session, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="יש להתחבר כדי ליצור אירוע")
+    phone = re.sub(r"\D", "", event.owner_phone or "")
+    if not re.match(r"^0\d{8,9}$", phone):
+        raise HTTPException(status_code=400, detail="מספר טלפון לא תקין")
+    db_event = models.Event(**event.model_dump(exclude={"owner_phone"}), owner_email=user.email, owner_phone=phone)
     db.add(db_event)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="אירוע עם אותו שם ותאריך כבר קיים")
     db.refresh(db_event)
     return db_event
 
 
+@app.get("/api/me/produced-events", response_model=list[schemas.EventOut])
+def get_my_produced_events(session: str = Cookie(default=None), db: Session = Depends(get_db)):
+    user = _get_user_from_cookie(session, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="לא מחובר")
+    return (
+        db.query(models.Event)
+        .filter(models.Event.owner_email == user.email)
+        .order_by(models.Event.id.desc())
+        .all()
+    )
+
+
+def _authorize_event_owner(event: models.Event, session: str, db: Session) -> None:
+    user = _get_user_from_cookie(session, db)
+    if event.owner_email and (not user or event.owner_email != user.email):
+        raise HTTPException(status_code=403, detail="אין הרשאה לנהל אירוע זה")
+
+
+@app.patch("/api/events/{event_id}", response_model=schemas.EventOut)
+def update_event(
+    event_id: int,
+    updates: schemas.EventUpdate,
+    db: Session = Depends(get_db),
+    session: str = Cookie(default=None),
+):
+    event = db.query(models.Event).filter(models.Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="האירוע לא נמצא")
+    _authorize_event_owner(event, session, db)
+    for field, value in updates.model_dump(exclude_unset=True).items():
+        setattr(event, field, value)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="אירוע עם אותו שם ותאריך כבר קיים")
+    db.refresh(event)
+    return event
+
+
+@app.delete("/api/events/{event_id}")
+def delete_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    session: str = Cookie(default=None),
+):
+    event = db.query(models.Event).filter(models.Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="האירוע לא נמצא")
+    _authorize_event_owner(event, session, db)
+    active_rides = db.query(models.Ride).filter(models.Ride.event_id == event_id).count()
+    if active_rides:
+        raise HTTPException(
+            status_code=400,
+            detail="לא ניתן למחוק אירוע עם נסיעות פעילות — יש לבטל אותן קודם",
+        )
+    db.delete(event)
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/api/events/{event_id}/attendees")
+def get_event_attendees(
+    event_id: int,
+    db: Session = Depends(get_db),
+    session: str = Cookie(default=None),
+):
+    event = db.query(models.Event).filter(models.Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="האירוע לא נמצא")
+    _authorize_event_owner(event, session, db)
+    rides = db.query(models.Ride).filter(models.Ride.event_id == event_id).all()
+    return {
+        "validated_count": db.query(models.UserEvent).filter(models.UserEvent.event_id == event_id).count(),
+        "rides_count": len(rides),
+        "rides": [
+            {
+                "id": r.id,
+                "driver_name": r.driver_name,
+                "city": r.city,
+                "departure_time": r.departure_time,
+                "seats_available": r.seats_available,
+                "approved_count": db.query(models.RideRequest).filter(
+                    models.RideRequest.ride_id == r.id,
+                    models.RideRequest.status == "approved",
+                ).count(),
+            }
+            for r in rides
+        ],
+    }
+
+
 # ── Rides ─────────────────────────────────────────────────────────
 @app.get("/api/rides")
-def get_rides(event_id: int = None, db: Session = Depends(get_db)):
+def get_rides(
+    event_id: int = None,
+    db: Session = Depends(get_db),
+    session: str = Cookie(default=None),
+):
     query = db.query(models.Ride)
     if event_id:
         query = query.filter(models.Ride.event_id == event_id)
-    return query.order_by(models.Ride.created_at.desc()).all()
+    rides = query.order_by(models.Ride.created_at.desc()).all()
+    me = _get_user_from_cookie(session, db)
+
+    ride_ids = [r.id for r in rides]
+    approved = []
+    if ride_ids:
+        approved = (
+            db.query(models.RideRequest, models.User)
+            .outerjoin(models.User, models.User.email == models.RideRequest.passenger_email)
+            .filter(
+                models.RideRequest.ride_id.in_(ride_ids),
+                models.RideRequest.status == "approved",
+            )
+            .all()
+        )
+
+    participants_by_ride = {}
+    for req, user in approved:
+        participants_by_ride.setdefault(req.ride_id, []).append({
+            "name":    req.passenger_name,
+            "age":     user.age if user else None,
+            "picture": user.picture if user else None,
+        })
+
+    # The logged-in user's own request per ride — lets the UI restore
+    # the "pending"/"approved" button state after a page reload.
+    my_requests = {}
+    if me and ride_ids:
+        for req in (
+            db.query(models.RideRequest)
+            .filter(
+                models.RideRequest.ride_id.in_(ride_ids),
+                models.RideRequest.passenger_email == me.email,
+            )
+            .all()
+        ):
+            my_requests[req.ride_id] = {"id": req.id, "status": req.status}
+
+    result = []
+    for r in rides:
+        d = {c.name: getattr(r, c.name) for c in r.__table__.columns}
+        d["participants"] = participants_by_ride.get(r.id, [])
+        d["my_request"]   = my_requests.get(r.id)
+        result.append(d)
+    return result
 
 
 @app.post("/api/rides", response_model=schemas.RideOut)
@@ -279,20 +517,42 @@ def delete_ride(
 
 
 @app.post("/api/rides/{ride_id}/join", response_model=schemas.RideRequestOut)
-def join_ride(ride_id: int, req: schemas.RideRequestCreate, db: Session = Depends(get_db)):
+def join_ride(
+    ride_id: int,
+    req: schemas.RideRequestCreate,
+    db: Session = Depends(get_db),
+    session: str = Cookie(default=None),
+):
     ride = db.query(models.Ride).filter(models.Ride.id == ride_id).first()
     if not ride:
         raise HTTPException(status_code=404, detail="הנסיעה לא נמצאה")
     if ride.seats_available <= 0:
         raise HTTPException(status_code=400, detail="אין מקומות פנויים")
-    db_req = models.RideRequest(ride_id=ride_id, **req.model_dump())
+    user = _get_user_from_cookie(session, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="יש להתחבר כדי להצטרף לנסיעה")
+    if user.age is None:
+        raise HTTPException(status_code=403, detail="יש להשלים גיל בפרופיל לפני הצטרפות לנסיעה")
+    if ride.driver_email and ride.driver_email == user.email:
+        raise HTTPException(status_code=400, detail="לא ניתן להצטרף לנסיעה של עצמך")
+    existing = db.query(models.RideRequest).filter(
+        models.RideRequest.ride_id == ride_id,
+        models.RideRequest.passenger_email == user.email,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="כבר שלחת בקשה לנסיעה זו")
+    payload = req.model_dump()
+    # Identity comes from the session, not from whatever the client typed
+    payload["passenger_name"]  = user.name
+    payload["passenger_email"] = user.email
+    db_req = models.RideRequest(ride_id=ride_id, **payload)
     db.add(db_req)
     db.commit()
     db.refresh(db_req)
     send_join_notification(
         driver_email=ride.driver_email or "",
         driver_name=ride.driver_name,
-        passenger_name=req.passenger_name,
+        passenger_name=user.name,
         ride_city=ride.city,
         departure_time=ride.departure_time,
     )
@@ -300,7 +560,12 @@ def join_ride(ride_id: int, req: schemas.RideRequestCreate, db: Session = Depend
 
 
 @app.delete("/api/rides/{ride_id}/join/{request_id}")
-def cancel_join(ride_id: int, request_id: int, db: Session = Depends(get_db)):
+def cancel_join(
+    ride_id: int,
+    request_id: int,
+    db: Session = Depends(get_db),
+    session: str = Cookie(default=None),
+):
     req = db.query(models.RideRequest).filter(
         models.RideRequest.id == request_id,
         models.RideRequest.ride_id == ride_id,
@@ -308,6 +573,14 @@ def cancel_join(ride_id: int, request_id: int, db: Session = Depends(get_db)):
     if not req:
         raise HTTPException(status_code=404, detail="הבקשה לא נמצאה")
     ride = req.ride
+    user = _get_user_from_cookie(session, db)
+    is_passenger = user and req.passenger_email == user.email
+    is_driver    = user and ride.driver_email == user.email
+    if not (is_passenger or is_driver):
+        raise HTTPException(status_code=403, detail="אין הרשאה לבטל בקשה זו")
+    # An approved passenger leaving frees their seat back up
+    if req.status == "approved":
+        ride.seats_available += 1
     send_cancel_notification(
         driver_email=ride.driver_email or "",
         driver_name=ride.driver_name,
@@ -317,3 +590,191 @@ def cancel_join(ride_id: int, request_id: int, db: Session = Depends(get_db)):
     db.delete(req)
     db.commit()
     return {"ok": True}
+
+
+@app.get("/api/me/requests")
+def get_my_pending_requests(session: str = Cookie(default=None), db: Session = Depends(get_db)):
+    user = _get_user_from_cookie(session, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="לא מחובר")
+    requests = (
+        db.query(models.RideRequest)
+        .join(models.Ride)
+        .filter(models.Ride.driver_email == user.email, models.RideRequest.status == "pending")
+        .order_by(models.RideRequest.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "ride_id": r.ride_id,
+            "passenger_name": r.passenger_name,
+            "created_at": r.created_at,
+            "ride_city": r.ride.city,
+            "ride_departure_time": r.ride.departure_time,
+        }
+        for r in requests
+    ]
+
+
+def _authorize_driver(ride: models.Ride, session: str, db: Session) -> None:
+    user = _get_user_from_cookie(session, db)
+    if ride.driver_email and (not user or ride.driver_email != user.email):
+        raise HTTPException(status_code=403, detail="אין הרשאה לנהל בקשה זו")
+
+
+@app.post("/api/rides/{ride_id}/join/{request_id}/approve", response_model=schemas.RideRequestOut)
+def approve_join(
+    ride_id: int,
+    request_id: int,
+    db: Session = Depends(get_db),
+    session: str = Cookie(default=None),
+):
+    req = db.query(models.RideRequest).filter(
+        models.RideRequest.id == request_id,
+        models.RideRequest.ride_id == ride_id,
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="הבקשה לא נמצאה")
+    ride = req.ride
+    _authorize_driver(ride, session, db)
+    if ride.seats_available <= 0:
+        raise HTTPException(status_code=400, detail="אין מקומות פנויים")
+    req.status = "approved"
+    ride.seats_available -= 1
+    db.commit()
+    db.refresh(req)
+    return req
+
+
+@app.post("/api/rides/{ride_id}/join/{request_id}/reject")
+def reject_join(
+    ride_id: int,
+    request_id: int,
+    db: Session = Depends(get_db),
+    session: str = Cookie(default=None),
+):
+    req = db.query(models.RideRequest).filter(
+        models.RideRequest.id == request_id,
+        models.RideRequest.ride_id == ride_id,
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="הבקשה לא נמצאה")
+    ride = req.ride
+    _authorize_driver(ride, session, db)
+    db.delete(req)
+    db.commit()
+    return {"ok": True}
+
+
+# ── Ride chat (WebSocket) ─────────────────────────────────────────
+# Room registry: ride_id -> list of live WebSocket connections.
+# In-memory — fine for a single replica; scaling to multiple pods
+# requires pub/sub (e.g. Redis) so messages cross pod boundaries.
+class ChatRooms:
+    def __init__(self):
+        self.rooms: dict[int, list[WebSocket]] = {}
+
+    async def connect(self, ride_id: int, ws: WebSocket):
+        await ws.accept()
+        self.rooms.setdefault(ride_id, []).append(ws)
+
+    def disconnect(self, ride_id: int, ws: WebSocket):
+        conns = self.rooms.get(ride_id, [])
+        if ws in conns:
+            conns.remove(ws)
+        if not conns:
+            self.rooms.pop(ride_id, None)
+
+    async def broadcast(self, ride_id: int, payload: dict):
+        for ws in list(self.rooms.get(ride_id, [])):
+            try:
+                await ws.send_json(payload)
+            except Exception:
+                self.disconnect(ride_id, ws)
+
+
+chat_rooms = ChatRooms()
+
+
+def _can_access_chat(ride: models.Ride, user: models.User | None, db: Session) -> bool:
+    """Chat is private: driver + approved passengers only."""
+    if not user:
+        return False
+    if ride.driver_email and ride.driver_email == user.email:
+        return True
+    return db.query(models.RideRequest).filter(
+        models.RideRequest.ride_id == ride.id,
+        models.RideRequest.passenger_email == user.email,
+        models.RideRequest.status == "approved",
+    ).first() is not None
+
+
+@app.get("/api/rides/{ride_id}/chat")
+def chat_history(
+    ride_id: int,
+    db: Session = Depends(get_db),
+    session: str = Cookie(default=None),
+):
+    ride = db.query(models.Ride).filter(models.Ride.id == ride_id).first()
+    if not ride:
+        raise HTTPException(status_code=404, detail="הנסיעה לא נמצאה")
+    user = _get_user_from_cookie(session, db)
+    if not _can_access_chat(ride, user, db):
+        raise HTTPException(status_code=403, detail="הצ'אט פתוח לנהג ולנוסעים שאושרו בלבד")
+    messages = (
+        db.query(models.ChatMessage)
+        .filter(models.ChatMessage.ride_id == ride_id)
+        .order_by(models.ChatMessage.created_at.asc())
+        .limit(200)
+        .all()
+    )
+    return [
+        {
+            "sender_name":  m.sender_name,
+            "sender_email": m.sender_email,
+            "text":         m.text,
+            "created_at":   m.created_at.isoformat(),
+        }
+        for m in messages
+    ]
+
+
+@app.websocket("/api/ws/rides/{ride_id}/chat")
+async def ride_chat(websocket: WebSocket, ride_id: int, db: Session = Depends(get_db)):
+    ride = db.query(models.Ride).filter(models.Ride.id == ride_id).first()
+    user = _get_user_from_cookie(websocket.cookies.get("session"), db)
+    if not ride or not _can_access_chat(ride, user, db):
+        # 4403: application-level "forbidden" close code (4000+ is the app range)
+        await websocket.close(code=4403)
+        return
+
+    await chat_rooms.connect(ride_id, websocket)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            # Keepalive — resets the ALB idle timeout (default 60s)
+            if data.get("type") == "ping":
+                await websocket.send_json({"type": "pong"})
+                continue
+            msg_text = (data.get("text") or "").strip()[:500]
+            if not msg_text:
+                continue
+            msg = models.ChatMessage(
+                ride_id=ride_id,
+                sender_name=user.name,
+                sender_email=user.email,
+                text=msg_text,
+            )
+            db.add(msg)
+            db.commit()
+            db.refresh(msg)
+            await chat_rooms.broadcast(ride_id, {
+                "type":         "message",
+                "sender_name":  user.name,
+                "sender_email": user.email,
+                "text":         msg_text,
+                "created_at":   msg.created_at.isoformat(),
+            })
+    except WebSocketDisconnect:
+        chat_rooms.disconnect(ride_id, websocket)
