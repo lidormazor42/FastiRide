@@ -7,10 +7,10 @@ set -euo pipefail
 cd "$(dirname "$0")/../terraform"
 
 echo "==> Deleting ArgoCD Application (cascade-deletes Ingress/ALB properly — otherwise selfHeal fights the helm uninstall below)"
-kubectl delete application fastiride-dev -n argocd --wait=true --timeout=120s 2>/dev/null || echo "    (already removed or ArgoCD not installed)"
+kubectl delete application fastiride-prod -n argocd --wait=true --timeout=120s 2>/dev/null || echo "    (already removed or ArgoCD not installed)"
 
 echo "==> Removing FastiRide Helm release (this deletes the ALB)"
-helm uninstall fastiride -n fastiride-dev 2>/dev/null || echo "    (already removed)"
+helm uninstall fastiride -n fastiride-prod 2>/dev/null || echo "    (already removed)"
 
 echo "==> Waiting 30s for the ALB and its security groups to fully delete"
 sleep 30

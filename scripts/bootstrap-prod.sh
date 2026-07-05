@@ -38,8 +38,8 @@ helm upgrade --install argocd argo/argo-cd \
   --create-namespace \
   --wait
 
-echo "==> Creating fastiride-dev namespace"
-kubectl create namespace fastiride-dev --dry-run=client -o yaml | kubectl apply -f -
+echo "==> Creating fastiride-prod namespace"
+kubectl create namespace fastiride-prod --dry-run=client -o yaml | kubectl apply -f -
 
 echo "==> Loading secrets from .env"
 cd ..
@@ -48,8 +48,8 @@ GOOGLE_CLIENT_SECRET=$(grep '^GOOGLE_CLIENT_SECRET=' .env | cut -d= -f2-)
 
 echo "==> Creating fastiride-secrets"
 kubectl create secret generic fastiride-secrets \
-  --namespace fastiride-dev \
-  --from-literal=database-url="postgresql://fastiride:fastiride-dev-2026@postgres.fastiride-dev.svc.cluster.local:5432/fastiride" \
+  --namespace fastiride-prod \
+  --from-literal=database-url="postgresql://fastiride:fastiride-dev-2026@postgres.fastiride-prod.svc.cluster.local:5432/fastiride" \
   --from-literal=postgres-password="fastiride-dev-2026" \
   --from-literal=session-secret="dev-session-secret-change-in-prod" \
   --from-literal=google-client-id="$GOOGLE_CLIENT_ID" \
@@ -59,23 +59,23 @@ kubectl create secret generic fastiride-secrets \
 echo "==> Deploying FastiRide via Helm"
 helm upgrade --install fastiride helm/fastiride \
   -f helm/fastiride/values.yaml \
-  -f helm/fastiride/values-dev.yaml \
-  --namespace fastiride-dev \
+  -f helm/fastiride/values-prod.yaml \
+  --namespace fastiride-prod \
   --wait
 
-echo "==> Registering fastiride-dev Application with ArgoCD"
-kubectl apply -f k8s/argocd/app-dev.yaml
+echo "==> Registering fastiride-prod Application with ArgoCD"
+kubectl apply -f k8s/argocd/app-prod.yaml
 
 echo "==> Waiting for ALB hostname to be assigned"
 ALB_HOSTNAME=""
 for i in $(seq 1 30); do
-  ALB_HOSTNAME=$(kubectl get ingress fastiride -n fastiride-dev -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+  ALB_HOSTNAME=$(kubectl get ingress fastiride -n fastiride-prod -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
   [ -n "$ALB_HOSTNAME" ] && break
   sleep 5
 done
 
 if [ -z "$ALB_HOSTNAME" ]; then
-  echo "    ALB hostname not ready yet — check 'kubectl get ingress -n fastiride-dev' manually and update DNS."
+  echo "    ALB hostname not ready yet — check 'kubectl get ingress -n fastiride-prod' manually and update DNS."
   exit 1
 fi
 

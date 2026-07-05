@@ -1,16 +1,16 @@
 backend:
-  replicas: 2
+  replicas: 1 # chat rooms live in-process memory — 2 replicas would split delivery across pods
   irsa:
-    roleArn: ""   # paste: terraform output backend_irsa_role_arn
+    roleArn: "arn:aws:iam::439594592108:role/fastiride-dev-backend-irsa"
 
 frontend:
-  replicas: 2
-
-postgres:
-  storage: 50Gi
+  replicas: 1
 
 ingress:
-  host: fastiride.example.com
+  host: fastiride.app
+
+config:
+  googleRedirectUri: https://fastiride.app/api/auth/google/callback
 
 hpa:
-  enabled: true
+  enabled: false

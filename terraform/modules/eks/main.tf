@@ -116,7 +116,7 @@ resource "aws_iam_role" "backend_irsa" {
       }
       Condition = {
         StringEquals = {
-          "${local.oidc_issuer}:sub" = "system:serviceaccount:fastiride-${var.environment}:backend"
+          "${local.oidc_issuer}:sub" = "system:serviceaccount:fastiride-prod:backend"
           "${local.oidc_issuer}:aud" = "sts.amazonaws.com"
         }
       }
