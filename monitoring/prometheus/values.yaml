@@ -21,13 +21,11 @@ prometheus:
         static_configs:
           - targets: ["backend.fastiride-prod.svc.cluster.local:8000"]
 
+# Disabled — nothing is configured to receive alerts (no Slack/PagerDuty), and it was
+# using up a pod slot on a node already at its 17-pod capacity limit. Re-enable + configure
+# a real receiver (route.receiver) if/when actual alerting is needed.
 alertmanager:
-  enabled: true
-  config:
-    global:
-      resolve_timeout: 5m
-    route:
-      receiver: "null"   # configure Slack/PagerDuty here for prod
+  enabled: false
 
 nodeExporter:
   enabled: true
