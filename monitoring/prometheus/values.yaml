@@ -17,11 +17,12 @@ prometheus:
           resources:
             requests:
               storage: 20Gi
-    # Scrape FastiRide backend metrics (if /metrics endpoint is added)
+    # Scrape FastiRide backend metrics — namespace is fastiride-prod, not fastiride
+    # (see project_roadmap memory: the app namespace was renamed 2026-07-05)
     additionalScrapeConfigs:
       - job_name: fastiride-backend
         static_configs:
-          - targets: ["backend.fastiride.svc.cluster.local:8000"]
+          - targets: ["backend.fastiride-prod.svc.cluster.local:8000"]
 
 alertmanager:
   enabled: true

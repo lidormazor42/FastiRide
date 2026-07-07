@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
 from jose import jwt, JWTError
 import httpx
+from prometheus_fastapi_instrumentator import Instrumentator
 from PIL import Image
 from pyzbar.pyzbar import decode as qr_decode
 import pytesseract
@@ -62,6 +63,7 @@ with engine.connect() as _conn:
     _conn.commit()
 
 app = FastAPI()
+Instrumentator().instrument(app).expose(app)
 
 GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
