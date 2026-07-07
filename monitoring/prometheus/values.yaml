@@ -1,7 +1,4 @@
-# kube-prometheus-stack — install with:
-# helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-# helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
-#   -n monitoring --create-namespace -f monitoring/prometheus/values.yaml
+# kube-prometheus-stack — deployed via ArgoCD (see k8s/argocd/app-monitoring-prometheus.yaml).
 
 grafana:
   enabled: false   # deployed separately (see monitoring/grafana/values.yaml)

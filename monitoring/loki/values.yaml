@@ -1,6 +1,4 @@
-# Loki (log aggregation) — install with:
-# helm upgrade --install loki grafana/loki-stack \
-#   -n monitoring --create-namespace -f monitoring/loki/values.yaml
+# Loki (log aggregation) — deployed via ArgoCD (see k8s/argocd/app-monitoring-loki.yaml).
 
 loki:
   enabled: true
@@ -17,7 +15,9 @@ promtail:
   enabled: true
   config:
     clients:
-      - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
+      # Service name is derived from the ArgoCD Application/Helm release name
+      # (monitoring-loki), not "loki" — see k8s/argocd/app-monitoring-loki.yaml
+      - url: http://monitoring-loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
     scrape_configs:
       - job_name: kubernetes-pods
         kubernetes_sd_configs:

@@ -18,11 +18,13 @@ datasources:
     datasources:
       - name: Prometheus
         type: prometheus
-        url: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+        # Service name is derived from the ArgoCD Application/Helm release name
+        # (monitoring-prometheus), not the chart name — see k8s/argocd/app-monitoring-prometheus.yaml
+        url: http://monitoring-prometheus-kube-prometheus.monitoring.svc.cluster.local:9090
         isDefault: true
       - name: Loki
         type: loki
-        url: http://loki.monitoring.svc.cluster.local:3100
+        url: http://monitoring-loki.monitoring.svc.cluster.local:3100
 
 dashboardProviders:
   dashboardproviders.yaml:
