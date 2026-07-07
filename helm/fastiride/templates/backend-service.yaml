@@ -3,6 +3,11 @@ kind: Service
 metadata:
   name: backend
   namespace: {{ .Release.Namespace }}
+  annotations:
+    # ALB target-group health check for THIS service only (not the whole Ingress,
+    # which would also affect the frontend service) — the API has no route at "/",
+    # only /api/health, so the ALB's default "/" health check was 404-ing constantly.
+    alb.ingress.kubernetes.io/healthcheck-path: /api/health
 spec:
   selector:
     app: backend
