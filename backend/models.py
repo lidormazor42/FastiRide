@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -56,11 +56,14 @@ class Ride(Base):
     city = Column(String, nullable=False)
     pickup_point = Column(String, nullable=False)
     departure_time = Column(String, nullable=False)
+    return_city  = Column(String, nullable=True)
+    return_time  = Column(String, nullable=True)
     seats_available = Column(Integer, default=2)
     driver_age   = Column(Integer, nullable=True)
     driver_photo = Column(String, nullable=True)
     driver_email = Column(String, nullable=True)
     vehicle_type = Column(String, nullable=True)
+    fuel_cost    = Column(Float, nullable=True)
     created_at   = Column(DateTime, default=datetime.utcnow)
 
     event = relationship("Event", back_populates="rides")
@@ -89,3 +92,14 @@ class ChatMessage(Base):
     sender_email = Column(String, nullable=False)
     text         = Column(String, nullable=False)
     created_at   = Column(DateTime, default=datetime.utcnow)
+
+
+class ChatRead(Base):
+    """Tracks when a user last read a ride's chat — powers unread badges."""
+    __tablename__ = "chat_reads"
+    __table_args__ = (UniqueConstraint("ride_id", "user_email"),)
+
+    id         = Column(Integer, primary_key=True, index=True)
+    ride_id    = Column(Integer, ForeignKey("rides.id"), nullable=False, index=True)
+    user_email = Column(String, nullable=False)
+    read_at    = Column(DateTime, default=datetime.utcnow)

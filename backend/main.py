@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+from datetime import datetime
 from io import BytesIO
 from urllib.parse import urlencode
 from fastapi import (
@@ -44,6 +45,14 @@ with engine.connect() as _conn:
     _conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS city TEXT"))
     _conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS owner_email TEXT"))
     _conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS owner_phone TEXT"))
+    _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS return_city TEXT"))
+    _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS return_time TEXT"))
+    _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS fuel_cost DOUBLE PRECISION"))
+    # Precise-location picker was tried three times (address autocomplete, then a
+    # pin-drop map, then a Voyager/Israel-bounds restyle) and rejected each time —
+    # dropped for good, back to plain free-text geocoding for the map view.
+    _conn.execute(text("ALTER TABLE rides DROP COLUMN IF EXISTS pickup_lat"))
+    _conn.execute(text("ALTER TABLE rides DROP COLUMN IF EXISTS pickup_lng"))
     _conn.execute(text("""
         DO $$ BEGIN
             ALTER TABLE events ADD CONSTRAINT events_name_date_key UNIQUE (name, date);
@@ -738,6 +747,88 @@ def chat_history(
         }
         for m in messages
     ]
+
+
+@app.get("/api/me/chats")
+def get_my_chats(session: str = Cookie(default=None), db: Session = Depends(get_db)):
+    """Every ride chat the user can access, with last message + unread count — powers the 'my chats' screen and the navbar badge."""
+    user = _get_user_from_cookie(session, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="לא מחובר")
+
+    driver_ride_ids = [
+        r.id for r in db.query(models.Ride.id).filter(models.Ride.driver_email == user.email).all()
+    ]
+    passenger_ride_ids = [
+        req.ride_id for req in db.query(models.RideRequest).filter(
+            models.RideRequest.passenger_email == user.email,
+            models.RideRequest.status == "approved",
+        ).all()
+    ]
+    ride_ids = list({*driver_ride_ids, *passenger_ride_ids})
+    if not ride_ids:
+        return []
+
+    rides = db.query(models.Ride).filter(models.Ride.id.in_(ride_ids)).all()
+    reads = {
+        r.ride_id: r.read_at
+        for r in db.query(models.ChatRead).filter(
+            models.ChatRead.ride_id.in_(ride_ids),
+            models.ChatRead.user_email == user.email,
+        ).all()
+    }
+
+    result = []
+    for ride in rides:
+        last_msg = (
+            db.query(models.ChatMessage)
+            .filter(models.ChatMessage.ride_id == ride.id)
+            .order_by(models.ChatMessage.created_at.desc())
+            .first()
+        )
+        if not last_msg:
+            continue
+        read_at = reads.get(ride.id)
+        unread_query = db.query(models.ChatMessage).filter(
+            models.ChatMessage.ride_id == ride.id,
+            models.ChatMessage.sender_email != user.email,
+        )
+        if read_at:
+            unread_query = unread_query.filter(models.ChatMessage.created_at > read_at)
+        result.append({
+            "ride_id":          ride.id,
+            "ride_city":        ride.city,
+            "ride_departure_time": ride.departure_time,
+            "last_message":     last_msg.text,
+            "last_message_at":  last_msg.created_at.isoformat(),
+            "unread_count":     unread_query.count(),
+        })
+    result.sort(key=lambda c: c["last_message_at"], reverse=True)
+    return result
+
+
+@app.post("/api/rides/{ride_id}/chat/read")
+def mark_chat_read(
+    ride_id: int,
+    db: Session = Depends(get_db),
+    session: str = Cookie(default=None),
+):
+    ride = db.query(models.Ride).filter(models.Ride.id == ride_id).first()
+    if not ride:
+        raise HTTPException(status_code=404, detail="הנסיעה לא נמצאה")
+    user = _get_user_from_cookie(session, db)
+    if not _can_access_chat(ride, user, db):
+        raise HTTPException(status_code=403, detail="הצ'אט פתוח לנהג ולנוסעים שאושרו בלבד")
+    read = db.query(models.ChatRead).filter(
+        models.ChatRead.ride_id == ride_id,
+        models.ChatRead.user_email == user.email,
+    ).first()
+    if read:
+        read.read_at = datetime.utcnow()
+    else:
+        db.add(models.ChatRead(ride_id=ride_id, user_email=user.email))
+    db.commit()
+    return {"ok": True}
 
 
 @app.websocket("/api/ws/rides/{ride_id}/chat")

@@ -45,7 +45,10 @@ class RideCreate(BaseModel):
     city: str
     pickup_point: str
     departure_time: str
+    return_city: Optional[str] = None
+    return_time: Optional[str] = None
     seats_available: int = 2
+    fuel_cost: Optional[float] = None
 
 
 class RideOut(RideCreate):
@@ -60,8 +63,11 @@ class RideUpdate(BaseModel):
     city: Optional[str] = None
     pickup_point: Optional[str] = None
     departure_time: Optional[str] = None
+    return_city: Optional[str] = None
+    return_time: Optional[str] = None
     seats_available: Optional[int] = None
     vehicle_type: Optional[str] = None
+    fuel_cost: Optional[float] = None
 
 
 class UserOut(BaseModel):
