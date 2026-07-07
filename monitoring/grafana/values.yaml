@@ -43,9 +43,104 @@ dashboards:
       revision: 1
       datasource: Prometheus
     fastapi-metrics:
-      gnetId: 14927   # FastAPI Observability
+      gnetId: 14927   # FastAPI Observability (community dashboard — some panels won't match our label names, kept for reference)
       revision: 1
       datasource: Prometheus
+    fastiride-backend:
+      datasource: Prometheus
+      # Custom dashboard built for FastiRide's actual metric names (http_requests_total,
+      # http_request_duration_seconds_*), following the RED method: Rate, Errors, Duration.
+      json: |
+        {
+          "title": "FastiRide Backend",
+          "uid": "fastiride-backend",
+          "schemaVersion": 39,
+          "version": 1,
+          "editable": true,
+          "timezone": "browser",
+          "time": { "from": "now-1h", "to": "now" },
+          "refresh": "30s",
+          "tags": ["fastiride"],
+          "panels": [
+            {
+              "id": 1,
+              "title": "Total Requests",
+              "type": "stat",
+              "datasource": "Prometheus",
+              "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+              "targets": [
+                { "expr": "sum(http_requests_total{job=\"fastiride-backend\"})", "legendFormat": "requests" }
+              ],
+              "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }] } }, "overrides": [] }
+            },
+            {
+              "id": 2,
+              "title": "Error Rate (4xx/5xx)",
+              "type": "stat",
+              "datasource": "Prometheus",
+              "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+              "targets": [
+                { "expr": "100 * sum(rate(http_requests_total{job=\"fastiride-backend\", status=~\"4xx|5xx\"}[5m])) / sum(rate(http_requests_total{job=\"fastiride-backend\"}[5m]))", "legendFormat": "error %" }
+              ],
+              "fieldConfig": { "defaults": { "unit": "percent", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] } }, "overrides": [] }
+            },
+            {
+              "id": 3,
+              "title": "p95 Latency",
+              "type": "stat",
+              "datasource": "Prometheus",
+              "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+              "targets": [
+                { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"fastiride-backend\"}[5m])) by (le))", "legendFormat": "p95" }
+              ],
+              "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.5 }, { "color": "red", "value": 2 }] } }, "overrides": [] }
+            },
+            {
+              "id": 4,
+              "title": "Request Rate (total)",
+              "type": "stat",
+              "datasource": "Prometheus",
+              "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+              "targets": [
+                { "expr": "sum(rate(http_requests_total{job=\"fastiride-backend\"}[5m]))", "legendFormat": "req/s" }
+              ],
+              "fieldConfig": { "defaults": { "unit": "reqps", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }] } }, "overrides": [] }
+            },
+            {
+              "id": 5,
+              "title": "Request Rate by Endpoint",
+              "type": "timeseries",
+              "datasource": "Prometheus",
+              "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
+              "targets": [
+                { "expr": "sum(rate(http_requests_total{job=\"fastiride-backend\"}[5m])) by (handler)", "legendFormat": "{{handler}}" }
+              ],
+              "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+            },
+            {
+              "id": 6,
+              "title": "p95 Latency by Endpoint",
+              "type": "timeseries",
+              "datasource": "Prometheus",
+              "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
+              "targets": [
+                { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"fastiride-backend\"}[5m])) by (le, handler))", "legendFormat": "{{handler}}" }
+              ],
+              "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+            },
+            {
+              "id": 7,
+              "title": "Requests by Status Code",
+              "type": "timeseries",
+              "datasource": "Prometheus",
+              "gridPos": { "h": 9, "w": 24, "x": 0, "y": 14 },
+              "targets": [
+                { "expr": "sum(rate(http_requests_total{job=\"fastiride-backend\"}[5m])) by (status)", "legendFormat": "{{status}}" }
+              ],
+              "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+            }
+          ]
+        }
 
 service:
   type: ClusterIP   # public access is via the Ingress below, not this service directly
