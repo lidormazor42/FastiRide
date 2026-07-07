@@ -12,6 +12,13 @@ persistence:
   storageClassName: gp2
   size: 5Gi
 
+# The EBS volume is ReadWriteOnce (locked to whichever node holds it) and there's only
+# 1 replica, so the default RollingUpdate strategy deadlocks: it tries to schedule the
+# new pod before killing the old one, but the old one is still holding the only volume
+# attachment. Recreate kills the old pod first, freeing the volume, then starts the new one.
+strategy:
+  type: Recreate
+
 datasources:
   datasources.yaml:
     apiVersion: 1
