@@ -56,6 +56,14 @@ kubectl create secret generic fastiride-secrets \
   --from-literal=google-client-secret="$GOOGLE_CLIENT_SECRET" \
   --dry-run=client -o yaml | kubectl apply -f -
 
+echo "==> Creating monitoring namespace + grafana-admin-credentials"
+kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic grafana-admin-credentials \
+  --namespace monitoring \
+  --from-literal=admin-user="admin" \
+  --from-literal=admin-password="1324" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
 echo "==> Deploying FastiRide via Helm"
 helm upgrade --install fastiride helm/fastiride \
   -f helm/fastiride/values.yaml \
@@ -65,6 +73,11 @@ helm upgrade --install fastiride helm/fastiride \
 
 echo "==> Registering fastiride-prod Application with ArgoCD"
 kubectl apply -f k8s/argocd/app-prod.yaml
+
+echo "==> Registering monitoring stack (Prometheus, Loki, Grafana) with ArgoCD"
+kubectl apply -f k8s/argocd/app-monitoring-prometheus.yaml
+kubectl apply -f k8s/argocd/app-monitoring-loki.yaml
+kubectl apply -f k8s/argocd/app-monitoring-grafana.yaml
 
 echo "==> Waiting for ALB hostname to be assigned"
 ALB_HOSTNAME=""
@@ -79,25 +92,39 @@ if [ -z "$ALB_HOSTNAME" ]; then
   exit 1
 fi
 
-echo "==> Pointing fastiride.app at $ALB_HOSTNAME"
+echo "==> Pointing fastiride.app + grafana.fastiride.app at $ALB_HOSTNAME (shared ALB)"
 cat > /tmp/dns-upsert.json <<EOF
 {
-  "Changes": [{
-    "Action": "UPSERT",
-    "ResourceRecordSet": {
-      "Name": "fastiride.app",
-      "Type": "A",
-      "AliasTarget": {
-        "HostedZoneId": "$ALB_HOSTED_ZONE_ID",
-        "DNSName": "$ALB_HOSTNAME",
-        "EvaluateTargetHealth": true
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "fastiride.app",
+        "Type": "A",
+        "AliasTarget": {
+          "HostedZoneId": "$ALB_HOSTED_ZONE_ID",
+          "DNSName": "$ALB_HOSTNAME",
+          "EvaluateTargetHealth": true
+        }
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "grafana.fastiride.app",
+        "Type": "A",
+        "AliasTarget": {
+          "HostedZoneId": "$ALB_HOSTED_ZONE_ID",
+          "DNSName": "$ALB_HOSTNAME",
+          "EvaluateTargetHealth": true
+        }
       }
     }
-  }]
+  ]
 }
 EOF
 aws route53 change-resource-record-sets \
   --hosted-zone-id "$DNS_ZONE_ID" \
   --change-batch file:///tmp/dns-upsert.json
 
-echo "==> Done. fastiride.app now points at $ALB_HOSTNAME"
+echo "==> Done. fastiride.app + grafana.fastiride.app now point at $ALB_HOSTNAME"

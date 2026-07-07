@@ -1,9 +1,11 @@
-# Grafana — install with:
-# helm repo add grafana https://grafana.github.io/helm-charts
-# helm upgrade --install grafana grafana/grafana \
-#   -n monitoring --create-namespace -f monitoring/grafana/values.yaml
+# Grafana — deployed via ArgoCD (see k8s/argocd/app-monitoring-grafana.yaml), not manual helm.
 
-adminPassword: CHANGE_ME
+# Password lives in a Kubernetes Secret created by bootstrap-prod.sh (same pattern as
+# fastiride-secrets for the main app) — never committed to Git in plaintext.
+admin:
+  existingSecret: grafana-admin-credentials
+  userKey: admin-user
+  passwordKey: admin-password
 
 persistence:
   enabled: true
@@ -44,4 +46,22 @@ dashboards:
       datasource: Prometheus
 
 service:
-  type: ClusterIP   # access via kubectl port-forward or ingress
+  type: ClusterIP   # public access is via the Ingress below, not this service directly
+
+# Shares the SAME ALB as the main app (group.name annotation) instead of provisioning
+# a second load balancer — AWS Load Balancer Controller merges any Ingress with a
+# matching group.name onto one ALB.
+ingress:
+  enabled: true
+  ingressClassName: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: "internet-facing"
+    alb.ingress.kubernetes.io/target-type: "ip"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:439594592108:certificate/c2fd86e1-e512-4d2f-8ec2-8f1d175f1cdd"
+    alb.ingress.kubernetes.io/group.name: "fastiride-shared"
+  hosts:
+    - grafana.fastiride.app
+  path: /
+  pathType: Prefix

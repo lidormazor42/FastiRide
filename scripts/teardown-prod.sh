@@ -6,8 +6,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../terraform"
 
-echo "==> Deleting ArgoCD Application (cascade-deletes Ingress/ALB properly — otherwise selfHeal fights the helm uninstall below)"
-kubectl delete application fastiride-prod -n argocd --wait=true --timeout=120s 2>/dev/null || echo "    (already removed or ArgoCD not installed)"
+echo "==> Deleting ArgoCD Applications (cascade-deletes Ingress/ALB properly — otherwise selfHeal fights the helm uninstall below)"
+echo "    fastiride-prod and monitoring-grafana both own an Ingress on the SAME shared ALB (group.name: fastiride-shared) — both must go before the ALB fully releases."
+kubectl delete application fastiride-prod monitoring-grafana monitoring-prometheus monitoring-loki -n argocd --wait=true --timeout=120s 2>/dev/null || echo "    (already removed or ArgoCD not installed)"
 
 echo "==> Removing FastiRide Helm release (this deletes the ALB)"
 helm uninstall fastiride -n fastiride-prod 2>/dev/null || echo "    (already removed)"
@@ -24,3 +25,4 @@ terraform state list
 echo "==> Done. Check AWS directly if you want extra confidence:"
 echo "    aws eks list-clusters   (should be empty)"
 echo "    aws ec2 describe-instances --filters Name=instance-state-name,Values=running,pending   (should be empty)"
+echo "    aws ec2 describe-volumes --filters Name=status,Values=available   (Prometheus/Loki/Grafana PVCs are EBS-CSI dynamic, same orphan risk as Postgres — check this every time)"
