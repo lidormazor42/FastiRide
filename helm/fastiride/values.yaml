@@ -4,7 +4,7 @@
 backend:
   image:
     repository: 439594592108.dkr.ecr.us-east-1.amazonaws.com/fastiride-dev-backend
-    tag: 9dfeaafd4964c4bb615c44d0c8c269b70e2509d6
+    tag: 3a8b8779f947ef49320cc9d4efc826eabe584e07
     pullPolicy: Always
   replicas: 2
   resources:
@@ -15,7 +15,7 @@ backend:
 frontend:
   image:
     repository: 439594592108.dkr.ecr.us-east-1.amazonaws.com/fastiride-dev-frontend
-    tag: 9dfeaafd4964c4bb615c44d0c8c269b70e2509d6
+    tag: 3a8b8779f947ef49320cc9d4efc826eabe584e07
     pullPolicy: Always
   replicas: 2
   resources:
