@@ -1,10 +1,18 @@
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.pool import StaticPool
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://fastiride:fastiride@db:5432/fastiride")
 
-engine = create_engine(DATABASE_URL)
+# sqlite:// only used by the test suite — StaticPool keeps a single connection
+# alive for the whole process so an in-memory DB doesn't vanish between requests.
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        DATABASE_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+else:
+    engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
