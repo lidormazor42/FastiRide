@@ -4,6 +4,18 @@ grafana:
   enabled: false   # deployed separately (see monitoring/grafana/values.yaml)
   adminPassword: CHANGE_ME
 
+# EKS is a managed control plane — AWS doesn't expose the scheduler, controller-manager,
+# or etcd for scraping (they're not customer-visible at all, by design). Without this,
+# the chart's default alert rules fire KubeSchedulerDown/KubeControllerManagerDown/
+# KubeEtcdDown forever — real-looking alerts about something that was never reachable
+# in the first place, not an actual outage.
+kubeScheduler:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeEtcd:
+  enabled: false
+
 prometheus:
   prometheusSpec:
     retention: 7d
