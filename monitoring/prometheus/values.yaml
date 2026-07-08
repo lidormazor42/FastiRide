@@ -40,7 +40,7 @@ alertmanager:
       # This is the IAM Access Key ID (an identifier, not the secret itself — the actual
       # secret is the derived SMTP password below, which IS file-mounted from a Secret).
       # Fill in with the `alertmanager_ses_smtp_username` terraform output after apply.
-      smtp_auth_username: "REPLACE_WITH_TERRAFORM_OUTPUT"
+      smtp_auth_username: "AKIAWMWPBE5WPO4ZRIWG"
       smtp_auth_password_file: /etc/alertmanager/secrets/alertmanager-ses-smtp/smtp-password
       smtp_require_tls: true
     route:
