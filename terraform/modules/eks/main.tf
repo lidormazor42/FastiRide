@@ -81,16 +81,30 @@ resource "aws_iam_role_policy_attachment" "nodes_ecr" {
 # override, EKS auto-selects its own optimized AMI AND auto-merges this user_data
 # with its own cluster-join bootstrap — we're only supplying one extra field
 # (kubelet maxPods), not replacing the join logic ourselves.
+#
+# First attempt at this failed apply with "User data was not in the MIME multipart
+# format" — a plain NodeConfig YAML isn't enough, EKS's merge step specifically
+# requires the MIME multipart wrapper below (Content-Type: application/node.eks.aws
+# as one part) even though there's only one part to merge in.
 resource "aws_launch_template" "nodes" {
   name_prefix = "fastiride-${var.environment}-nodes-"
 
   user_data = base64encode(<<-EOT
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="//"
+
+    --//
+    Content-Type: application/node.eks.aws
+
+    ---
     apiVersion: node.eks.aws/v1alpha1
     kind: NodeConfig
     spec:
       kubelet:
         config:
           maxPods: 110
+
+    --//--
   EOT
   )
 
