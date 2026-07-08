@@ -26,7 +26,7 @@ resource "aws_eks_cluster" "main" {
   vpc_config {
     subnet_ids              = var.subnet_ids
     endpoint_private_access = true
-    endpoint_public_access  = true   # set false in prod after VPN/bastion is ready
+    endpoint_public_access  = true # set false in prod after VPN/bastion is ready
   }
 
   depends_on = [aws_iam_role_policy_attachment.cluster_policy]
@@ -72,6 +72,33 @@ resource "aws_iam_role_policy_attachment" "nodes_ecr" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+# ── Node bootstrap customization: raise max-pods per node ─────────────────────
+# The default max-pods (17 on t3.medium) is a static lookup-table value based on
+# instance type ONLY — it does not know prefix delegation exists, so enabling
+# prefix delegation on the CNI (below) alone changes nothing without this.
+#
+# No custom `image_id` is set here on purpose: when a launch template has no AMI
+# override, EKS auto-selects its own optimized AMI AND auto-merges this user_data
+# with its own cluster-join bootstrap — we're only supplying one extra field
+# (kubelet maxPods), not replacing the join logic ourselves.
+resource "aws_launch_template" "nodes" {
+  name_prefix = "fastiride-${var.environment}-nodes-"
+
+  user_data = base64encode(<<-EOT
+    apiVersion: node.eks.aws/v1alpha1
+    kind: NodeConfig
+    spec:
+      kubelet:
+        config:
+          maxPods: 110
+  EOT
+  )
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 # ── Node Group (private subnets) ──────────────────────────────────────────────
 resource "aws_eks_node_group" "main" {
   cluster_name    = aws_eks_cluster.main.name
@@ -79,6 +106,11 @@ resource "aws_eks_node_group" "main" {
   node_role_arn   = aws_iam_role.nodes.arn
   subnet_ids      = var.subnet_ids
   instance_types  = [var.node_instance_type]
+
+  launch_template {
+    id      = aws_launch_template.nodes.id
+    version = aws_launch_template.nodes.latest_version
+  }
 
   scaling_config {
     desired_size = var.node_desired_size
@@ -95,6 +127,28 @@ resource "aws_eks_node_group" "main" {
     aws_iam_role_policy_attachment.nodes_cni,
     aws_iam_role_policy_attachment.nodes_ecr,
   ]
+}
+
+# ── VPC CNI addon: enable prefix delegation ────────────────────────────────────
+# Adopts the CNI that already came bundled with cluster creation (it was never a
+# Terraform-managed EKS addon before — resolve_conflicts_on_create=OVERWRITE takes
+# it over instead of failing on "already exists"). Without this, the max-pods
+# increase above is pointless: kubelet would allow more pods than the CNI can
+# actually hand out IP addresses for, and pods would get stuck in ContainerCreating.
+resource "aws_eks_addon" "vpc_cni" {
+  cluster_name                = aws_eks_cluster.main.name
+  addon_name                  = "vpc-cni"
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  configuration_values = jsonencode({
+    env = {
+      ENABLE_PREFIX_DELEGATION = "true"
+      WARM_PREFIX_TARGET       = "1"
+    }
+  })
+
+  depends_on = [aws_eks_node_group.main]
 }
 
 # ── IRSA: Backend service account — sends emails via SES ─────────────────────
