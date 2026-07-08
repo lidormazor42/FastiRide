@@ -43,8 +43,17 @@ helm upgrade --install argocd argo/argo-cd \
   --create-namespace \
   --wait
 
-echo "==> Creating fastiride-prod namespace"
+echo "==> Creating fastiride-prod + fastiride-staging namespaces"
 kubectl create namespace fastiride-prod --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace fastiride-staging --dry-run=client -o yaml | kubectl apply -f -
+
+echo "==> Ensuring the fastiride_staging database exists on RDS (prod uses the default 'fastiride' db)"
+kubectl run rds-create-staging-db --image=postgres:16-alpine --rm -i --restart=Never \
+  --env="PGPASSWORD=${RDS_PASSWORD}" \
+  --command -- sh -c "
+    psql -h ${RDS_ENDPOINT%:*} -U fastiride -d fastiride -tAc \"SELECT 1 FROM pg_database WHERE datname='fastiride_staging'\" | grep -q 1 || \
+    psql -h ${RDS_ENDPOINT%:*} -U fastiride -d fastiride -c 'CREATE DATABASE fastiride_staging'
+  " 2>&1 || true
 
 echo "==> Loading secrets from .env"
 cd ..
@@ -52,10 +61,18 @@ GOOGLE_CLIENT_ID=$(grep '^GOOGLE_CLIENT_ID=' .env | cut -d= -f2-)
 GOOGLE_CLIENT_SECRET=$(grep '^GOOGLE_CLIENT_SECRET=' .env | cut -d= -f2-)
 ALERTMANAGER_SMTP_PASSWORD=$(grep '^ALERTMANAGER_SMTP_PASSWORD=' .env | cut -d= -f2-)
 
-echo "==> Creating fastiride-secrets"
+echo "==> Creating fastiride-secrets (prod → 'fastiride' db, staging → 'fastiride_staging' db, same RDS instance)"
 kubectl create secret generic fastiride-secrets \
   --namespace fastiride-prod \
   --from-literal=database-url="postgresql://fastiride:${RDS_PASSWORD}@${RDS_ENDPOINT}/fastiride" \
+  --from-literal=session-secret="dev-session-secret-change-in-prod" \
+  --from-literal=google-client-id="$GOOGLE_CLIENT_ID" \
+  --from-literal=google-client-secret="$GOOGLE_CLIENT_SECRET" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create secret generic fastiride-secrets \
+  --namespace fastiride-staging \
+  --from-literal=database-url="postgresql://fastiride:${RDS_PASSWORD}@${RDS_ENDPOINT}/fastiride_staging" \
   --from-literal=session-secret="dev-session-secret-change-in-prod" \
   --from-literal=google-client-id="$GOOGLE_CLIENT_ID" \
   --from-literal=google-client-secret="$GOOGLE_CLIENT_SECRET" \
@@ -75,15 +92,22 @@ kubectl create secret generic alertmanager-ses-smtp \
   --from-literal=smtp-password="$ALERTMANAGER_SMTP_PASSWORD" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-echo "==> Deploying FastiRide via Helm"
+echo "==> Deploying FastiRide via Helm (prod + staging)"
 helm upgrade --install fastiride helm/fastiride \
   -f helm/fastiride/values.yaml \
   -f helm/fastiride/values-prod.yaml \
   --namespace fastiride-prod \
   --wait
 
-echo "==> Registering fastiride-prod Application with ArgoCD"
+helm upgrade --install fastiride-staging helm/fastiride \
+  -f helm/fastiride/values.yaml \
+  -f helm/fastiride/values-staging.yaml \
+  --namespace fastiride-staging \
+  --wait
+
+echo "==> Registering fastiride-prod + fastiride-staging Applications with ArgoCD"
 kubectl apply -f k8s/argocd/app-prod.yaml
+kubectl apply -f k8s/argocd/app-staging.yaml
 
 echo "==> Registering monitoring stack (Prometheus, Loki, Grafana) with ArgoCD"
 kubectl apply -f k8s/argocd/app-monitoring-prometheus.yaml
@@ -103,7 +127,7 @@ if [ -z "$ALB_HOSTNAME" ]; then
   exit 1
 fi
 
-echo "==> Pointing fastiride.app + grafana.fastiride.app at $ALB_HOSTNAME (shared ALB)"
+echo "==> Pointing fastiride.app + staging.fastiride.app + grafana.fastiride.app at $ALB_HOSTNAME (shared ALB)"
 cat > /tmp/dns-upsert.json <<EOF
 {
   "Changes": [
@@ -111,6 +135,18 @@ cat > /tmp/dns-upsert.json <<EOF
       "Action": "UPSERT",
       "ResourceRecordSet": {
         "Name": "fastiride.app",
+        "Type": "A",
+        "AliasTarget": {
+          "HostedZoneId": "$ALB_HOSTED_ZONE_ID",
+          "DNSName": "$ALB_HOSTNAME",
+          "EvaluateTargetHealth": true
+        }
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "staging.fastiride.app",
         "Type": "A",
         "AliasTarget": {
           "HostedZoneId": "$ALB_HOSTED_ZONE_ID",
@@ -138,4 +174,6 @@ aws route53 change-resource-record-sets \
   --hosted-zone-id "$DNS_ZONE_ID" \
   --change-batch file:///tmp/dns-upsert.json
 
-echo "==> Done. fastiride.app + grafana.fastiride.app now point at $ALB_HOSTNAME"
+echo "==> Done. fastiride.app + staging.fastiride.app + grafana.fastiride.app now point at $ALB_HOSTNAME"
+echo "    IMPORTANT: add https://staging.fastiride.app/api/auth/google/callback to Google Cloud Console's"
+echo "    OAuth client 'Authorized redirect URIs' — this is a manual step, no AWS/Terraform equivalent."

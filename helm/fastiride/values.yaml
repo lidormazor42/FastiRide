@@ -1,31 +1,29 @@
-# Default values — override with values-dev.yaml or values-prod.yaml
-# ci-test: verifying OIDC pipeline
+# Shared defaults — image tags and everything environment-specific (host,
+# replicas, IRSA role) live in values-staging.yaml / values-prod.yaml instead.
+# Staging's tag is bumped by CI on every merge to main; prod's tag is only
+# bumped by the promote-to-production job, triggered by a version tag push.
 
 backend:
   image:
     repository: 439594592108.dkr.ecr.us-east-1.amazonaws.com/fastiride-dev-backend
-    tag: c5cfad567368f4335398ae5f6ae16784fdb54b09
     pullPolicy: Always
   replicas: 2
   resources:
     requests: {cpu: 100m, memory: 256Mi}
     limits: {cpu: 500m, memory: 512Mi}
   irsa:
-    roleArn: "" # set in values-dev/prod.yaml after terraform apply
+    roleArn: "" # set in values-staging/prod.yaml after terraform apply
 frontend:
   image:
     repository: 439594592108.dkr.ecr.us-east-1.amazonaws.com/fastiride-dev-frontend
-    tag: c5cfad567368f4335398ae5f6ae16784fdb54b09
     pullPolicy: Always
   replicas: 2
   resources:
     requests: {cpu: 50m, memory: 64Mi}
     limits: {cpu: 200m, memory: 128Mi}
 ingress:
-  host: fastiride.app
   tlsEnabled: true
 config:
-  googleRedirectUri: https://fastiride.app/api/auth/google/callback
   sesSenderEmail: noreply@fastiride.app
   awsRegion: us-east-1
   useRekognition: "true"

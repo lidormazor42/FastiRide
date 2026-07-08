@@ -1,14 +1,18 @@
-name: CI — Build & Push to ECR
+name: CI — Lint, Test, Deploy to Staging
+
+# GitHub Flow: feature branches → PR → main. Every merge to main that passes
+# lint+tests deploys to staging automatically. Production only updates when a
+# version tag is pushed (see promote-to-production.yaml) — see PROJECT_BOOK.md.
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - "backend/**"
       - "frontend/**"
       - "helm/**"
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 env:
   AWS_REGION: us-east-1
@@ -56,9 +60,9 @@ jobs:
         working-directory: backend
         run: python -m pytest tests/ -v
 
-  # ── Job 3: Build & Push to ECR (main branch only) ───────────────────────────
-  build-push:
-    name: Build & Push Images
+  # ── Job 3: Build, push, deploy to STAGING (main branch only) ─────────────────
+  deploy-staging:
+    name: Deploy to Staging
     needs: [lint, test]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -112,17 +116,18 @@ jobs:
       - name: Install yq
         uses: mikefarah/yq@v4
 
-      # GitOps: update image tags in Helm values → ArgoCD picks up the change
-      - name: Update image tags (GitOps trigger)
+      # GitOps: only values-staging.yaml gets bumped here — production's tag
+      # only moves via promote-to-production.yaml, on an explicit version tag.
+      - name: Update staging image tags (GitOps trigger)
         env:
           TAG: ${{ github.sha }}
         run: |
           cd helm/fastiride
-          yq -i ".backend.image.tag = \"$TAG\"" values.yaml
-          yq -i ".frontend.image.tag = \"$TAG\"" values.yaml
+          yq -i ".backend.image.tag = \"$TAG\"" values-staging.yaml
+          yq -i ".frontend.image.tag = \"$TAG\"" values-staging.yaml
           git config user.email "ci@fastiride.app"
           git config user.name  "FastiRide CI"
-          git add values.yaml
+          git add values-staging.yaml
           git diff --staged --quiet || \
-            git commit -m "Bump images to $TAG [skip ci]"
+            git commit -m "Deploy $TAG to staging [skip ci]"
           git push

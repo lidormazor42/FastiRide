@@ -1,0 +1,46 @@
+name: Promote to Production
+
+# Deliberately does NOT rebuild any images — it promotes whatever is already
+# running on staging (already built, pushed, and validated there) by copying
+# staging's current image tags into values-prod.yaml. A version tag is a
+# decision ("this exact thing, right now, is what production should run"),
+# not a new build.
+#
+# No `paths:` filter here on purpose — a tag push carries no new file diff of
+# its own, so a paths filter on a tag-only trigger can silently never fire.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  promote:
+    name: Promote staging build to production
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}  # same reason as deploy-staging — main is protected
+          ref: main                    # the tag points at a commit on main; write the promotion back onto main
+
+      - name: Install yq
+        uses: mikefarah/yq@v4
+
+      - name: Promote staging's current image tags to production
+        run: |
+          cd helm/fastiride
+          BACKEND_TAG=$(yq '.backend.image.tag' values-staging.yaml)
+          FRONTEND_TAG=$(yq '.frontend.image.tag' values-staging.yaml)
+          echo "Promoting backend=$BACKEND_TAG frontend=$FRONTEND_TAG to production ($GITHUB_REF_NAME)"
+          yq -i ".backend.image.tag = \"$BACKEND_TAG\"" values-prod.yaml
+          yq -i ".frontend.image.tag = \"$FRONTEND_TAG\"" values-prod.yaml
+          git config user.email "ci@fastiride.app"
+          git config user.name  "FastiRide CI"
+          git add values-prod.yaml
+          git diff --staged --quiet || \
+            git commit -m "Promote $GITHUB_REF_NAME to production [skip ci]"
+          git push origin HEAD:main

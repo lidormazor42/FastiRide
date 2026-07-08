@@ -11,7 +11,7 @@ A ride-sharing platform for festival attendees — built as an end-to-end DevOps
 | Database | Amazon RDS (PostgreSQL 16) | managed backups/patching — see FinOps log for why this replaced a StatefulSet |
 | Container Runtime | Docker | standard, and what Compose/K8s both expect |
 | Orchestration | Kubernetes (Amazon EKS) | the actual subject of the course |
-| Packaging | Helm | one chart, two value files (`values.yaml` + `values-prod.yaml`) — no duplicated manifests |
+| Packaging | Helm | one chart, per-environment value files (`values.yaml` + `values-staging.yaml`/`values-prod.yaml`) — no duplicated manifests |
 | IaC | Terraform (S3 remote state) | every AWS resource is code, nothing clicked into existence |
 | CI | GitHub Actions | lint → unit tests → build → push → GitOps commit |
 | CD | ArgoCD | pulls from Git, not pushed to by CI — Git is the only source of truth |
@@ -84,22 +84,29 @@ flowchart TB
     ArgoCD --> EKS
 ```
 
-**How a deploy actually happens:** push to `main` → GitHub Actions lints, runs the pytest suite, and (only if both pass) builds and pushes Docker images to ECR → CI commits the new image tag back into `helm/fastiride/values.yaml` (a "GitOps trigger", not a direct deploy) → ArgoCD notices the Git change on its next poll and applies it to the cluster. **Nothing ever deploys by CI pushing to the cluster directly** — Git is the only thing ArgoCD trusts.
+**How a deploy actually happens:** push to `main` → GitHub Actions lints, runs the pytest suite, and (only if both pass) builds and pushes Docker images to ECR → CI commits the new image tag into `helm/fastiride/values-staging.yaml` (a "GitOps trigger", not a direct deploy) → ArgoCD notices the Git change on its next poll and deploys it to **staging**. **Nothing ever deploys by CI pushing to the cluster directly** — Git is the only thing ArgoCD trusts. Production only moves when someone deliberately pushes a version tag (see below) — a merge to `main` alone is never enough to reach `fastiride.app`.
 
 ### Environments
 
-This project deliberately has **one AWS account/region**, not a separate dev+prod AWS footprint — that would double the cost for a personal project with a single maintainer. Instead:
+Local Docker Compose is dev. On AWS, there are **two environments sharing one EKS cluster, one RDS instance (separate databases), and one ALB** — not two full AWS footprints, which would double the cost for a personal project with a single maintainer:
 
-| | Local (dev) | AWS/EKS (prod) |
-|---|---|---|
-| How it runs | `docker compose up` | `terraform apply` + `./scripts/bootstrap-prod.sh` |
-| Database | Postgres container | Amazon RDS |
-| Where code lands | not deployed anywhere | `fastiride.app`, via ALB + Route 53 |
-| Torn down | `docker compose down` | `./scripts/teardown-prod.sh` — nightly, to control cost |
+| | Local (dev) | Staging | Production |
+|---|---|---|---|
+| Domain | — | `staging.fastiride.app` | `fastiride.app` |
+| Namespace | — | `fastiride-staging` | `fastiride-prod` |
+| Database | Postgres container | `fastiride_staging` (same RDS instance) | `fastiride` (same RDS instance) |
+| Deploys on | `docker compose up` | every merge to `main` (automatic) | a pushed version tag (`v1.2.0`) — deliberate, promotes the exact image already validated on staging |
+| Replicas | — | 1 backend / 1 frontend | 1 backend / 2 frontend |
 
-### GitFlow
+### Git flow
 
-`main` is what ArgoCD watches — every merge into it is a real deploy. Day-to-day work happens on `develop` and short-lived `feature/*` branches; a pull request into `develop` runs lint + unit tests before it can merge, and `develop` merges into `main` when a change is ready to actually go live.
+**GitHub Flow**, not GitFlow — no long-lived `develop` branch. `feature/*` branches → PR into `main` (branch-protected: PR required, lint+tests must run). Every merge to `main` auto-deploys to staging. When a change has been checked out on staging and is ready for real users, tag it:
+
+```bash
+git tag v1.2.0 && git push origin v1.2.0
+```
+
+That tag push triggers `promote-to-production.yaml`, a separate workflow that does **not rebuild anything** — it copies staging's already-built, already-validated image tags into `values-prod.yaml`. Production only ever runs an artifact that already ran on staging first.
 
 ### FinOps Decision Log
 
@@ -124,10 +131,10 @@ FastiRide/
 ├── frontend/            Nginx + HTML/JS, Dockerfile
 ├── terraform/           IaC — vpc, ecr, eks, rds, uploads (S3), dns, github-oidc, budget-alerts, ses-alerting
 ├── helm/fastiride/       Helm chart — Deployments, Service, Ingress, HPA, Postgres backup CronJob
-├── k8s/argocd/           ArgoCD Application manifests (app + monitoring stack)
+├── k8s/argocd/           ArgoCD Applications (staging + prod + monitoring stack)
 ├── monitoring/           Prometheus/Loki/Grafana values.yaml — deployed via ArgoCD, not manual helm
 ├── scripts/              bootstrap-prod.sh / teardown-prod.sh / derive-ses-smtp-password.py
-├── .github/workflows/    CI: lint → pytest → build → push → GitOps bump
+├── .github/workflows/    ci.yaml (lint → pytest → build → deploy staging), promote-to-production.yaml (version tag)
 ├── PROJECT_BOOK.md       Full write-up in Hebrew (architecture, tools, problems & solutions, exam prep)
 └── docs/images/          Screenshots referenced below
 ```
@@ -146,17 +153,19 @@ docker compose up -d
 # Frontend: http://localhost
 ```
 
-### AWS deployment (prod)
+### AWS deployment (staging + production)
 
 ```bash
 cd terraform
 terraform init
 terraform apply -var-file="dev.tfvars"   # yes, "dev.tfvars" — see naming note below
 cd ..
-./scripts/bootstrap-prod.sh              # installs LBC, ArgoCD, secrets, then registers everything with ArgoCD
+./scripts/bootstrap-prod.sh              # installs LBC, ArgoCD, secrets, then deploys BOTH fastiride-staging and fastiride-prod
 ```
 
-**Naming note:** AWS resources (`fastiride-dev` cluster, IAM roles, etc.) kept their original `dev` names — renaming them would mean destroying and recreating the whole cluster for a cosmetic change. The Kubernetes-level naming (`fastiride-prod` namespace, `fastiride.app` domain) is what actually reflects that this is the live/production environment.
+One run of this script brings up both environments (they share the cluster). From here on, staging updates itself on every merge to `main`; production only moves when you push a version tag (see Git flow above).
+
+**Naming note:** AWS resources (`fastiride-dev` cluster, IAM roles, etc.) kept their original `dev` names — renaming them would mean destroying and recreating the whole cluster for a cosmetic change. The Kubernetes-level naming (`fastiride-staging`/`fastiride-prod` namespaces, `staging.fastiride.app`/`fastiride.app` domains) is what actually reflects the real environments.
 
 ### Accessing ArgoCD and Grafana
 

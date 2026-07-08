@@ -7,11 +7,12 @@ set -euo pipefail
 cd "$(dirname "$0")/../terraform"
 
 echo "==> Deleting ArgoCD Applications (cascade-deletes Ingress/ALB properly — otherwise selfHeal fights the helm uninstall below)"
-echo "    fastiride-prod and monitoring-grafana both own an Ingress on the SAME shared ALB (group.name: fastiride-shared) — both must go before the ALB fully releases."
-kubectl delete application fastiride-prod monitoring-grafana monitoring-prometheus monitoring-loki -n argocd --wait=true --timeout=120s 2>/dev/null || echo "    (already removed or ArgoCD not installed)"
+echo "    fastiride-prod, fastiride-staging, and monitoring-grafana all own an Ingress on the SAME shared ALB (group.name: fastiride-shared) — all must go before the ALB fully releases."
+kubectl delete application fastiride-prod fastiride-staging monitoring-grafana monitoring-prometheus monitoring-loki -n argocd --wait=true --timeout=120s 2>/dev/null || echo "    (already removed or ArgoCD not installed)"
 
-echo "==> Removing FastiRide Helm release (this deletes the ALB)"
+echo "==> Removing FastiRide Helm releases (prod + staging — this deletes the ALB)"
 helm uninstall fastiride -n fastiride-prod 2>/dev/null || echo "    (already removed)"
+helm uninstall fastiride-staging -n fastiride-staging 2>/dev/null || echo "    (already removed)"
 
 echo "==> Waiting 30s for the ALB and its security groups to fully delete"
 sleep 30

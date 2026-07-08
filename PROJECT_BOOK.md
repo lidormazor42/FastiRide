@@ -41,14 +41,18 @@ FastiRide היא פלטפורמת שיתוף נסיעות לפסטיבלים —
 
 ## 6. תהליך העבודה
 
-עבודה לפי GitFlow: ענף `develop` לפיתוח שוטף, `feature/*` קצרים לכל שינוי, Pull Request חזרה ל-`develop` (מריץ lint+tests), ומיזוג ל-`main` כשמוכן לעלות בפועל — `main` הוא מה ש-ArgoCD עוקב אחריו, כל merge אליו הוא deploy אמיתי.
+עבודה לפי **GitHub Flow** (לא GitFlow — אין ענף `develop` ארוך-טווח): `feature/*` קצר לכל שינוי, Pull Request ישירות ל-`main` (branch protection — PR חובה, lint+tests רצים). כל merge ל-`main` **מפרס אוטומטית ל-staging** (`staging.fastiride.app`). כשמוכן להעלות לפרודקשן בפועל, דוחפים git tag (`git tag v1.2.0 && git push origin v1.2.0`) — זה מריץ workflow נפרד שמעלה בדיוק את אותו image שכבר נבדק ב-staging ל-production (`fastiride.app`), **בלי build מחדש**. ראו סעיף 4 להרחבה.
 
 ## 7. Pipeline (CI/CD)
 
-`.github/workflows/ci.yaml` — שלושה jobs:
+שני קבצי workflow, אחראים על שני deploy triggers שונים:
+
+**`.github/workflows/ci.yaml`** — רץ על כל push/PR ל-`main`, שלושה jobs:
 1. **Lint** — `ruff` על קוד ה-Python.
 2. **Test** — `pytest` על סוויטת בדיקות אמיתית (backend/tests/) — מריץ מול sqlite בזיכרון, לא תלוי בשום שירות חיצוני.
-3. **Build & Push** (רק על push ל-`main`, ורק אם שני הקודמים עברו) — בונה image ל-backend ול-frontend, דוחף ל-ECR, ואז **מעדכן את tag ה-image בקובץ ה-Helm values ב-Git עצמו** (לא נוגע בקלאסטר!) — זה ה"טריגר" ש-ArgoCD מזהה ומסנכרן ממנו.
+3. **Deploy to Staging** (רק על push ל-`main`, ורק אם שני הקודמים עברו) — בונה image ל-backend ול-frontend, דוחף ל-ECR, ואז **מעדכן את tag ה-image ב-`values-staging.yaml` ב-Git עצמו** (לא נוגע בקלאסטר!) — זה ה"טריגר" ש-ArgoCD מזהה ומסנכרן ל-staging.
+
+**`.github/workflows/promote-to-production.yaml`** — רץ **רק** כשדוחפים git tag בפורמט `v*`. לא בונה שום image חדש — קורא את ה-tags הנוכחיים מ-`values-staging.yaml` (מה שכבר רץ ואומת ב-staging) וכותב אותם ל-`values-prod.yaml`. כך production תמיד מריץ בדיוק את מה ש"עבר" ב-staging, לא build עצמאי.
 
 ## 8. Kubernetes
 
@@ -119,10 +123,10 @@ _(לכתוב אישית — מה למדת, מה היה הכי מאתגר, מה �
 כי EC2 בודד לא מחזיר את עצמו לחיים כשהוא קורס. Kubernetes שומר על מספר replicas רצוי (backend, frontend), מנתב תעבורה גם כש-pods מוחלפים (Service), ומאפשר deploy בלי downtime (rolling update).
 
 **מה קורה כשעושים Push?**
-ל-`develop`/`main`: GitHub Actions מריץ lint ואז pytest. אם שניהם עוברים ורק אם ה-push הוא ל-`main` — בונה images, דוחף ל-ECR, ומעדכן את ה-tag בקובץ Helm values **ב-Git עצמו** (לא נוגע בקלאסטר ישירות).
+ל-`main` (אחרי merge של PR): GitHub Actions מריץ lint ואז pytest. אם שניהם עוברים — בונה images, דוחף ל-ECR, ומעדכן את ה-tag ב-`values-staging.yaml` **ב-Git עצמו** (לא נוגע בקלאסטר ישירות). זה מפרס ל-**staging בלבד**, אוטומטית, בכל merge.
 
 **איך מתבצע Deployment?**
-ArgoCD סורק את ה-repo כל ~2 דקות, ורואה שקובץ ה-values השתנה (tag חדש) — מיישם את זה לקלאסטר לבד. אני אף פעם לא מריץ `kubectl apply` או `helm upgrade` ידנית בפרודקשן.
+ArgoCD סורק את ה-repo כל ~2 דקות, ורואה שקובץ ה-values השתנה — מיישם את זה לקלאסטר לבד. אני אף פעם לא מריץ `kubectl apply` או `helm upgrade` ידנית. **production לא מתעדכן ממש merge** — רק כשדוחפים git tag בפורמט `vX.Y.Z`, מה שמריץ workflow נפרד (`promote-to-production.yaml`) שמעתיק את ה-tags הקיימים מ-`values-staging.yaml` (image שכבר נבנה ונבדק) לתוך `values-prod.yaml` — בלי build מחדש. כך production תמיד מריץ בדיוק את מה שכבר עבד ב-staging.
 
 **למה Terraform?**
 כי אחרת התשתית קיימת רק "בראש שלי" ובקונסולת AWS — בלתי אפשרי לשחזר, לבדוק, או להסביר במדויק מה קיים ולמה. עם Terraform, `terraform destroy` ואז `terraform apply` בונים בדיוק אותה תשתית מחדש.

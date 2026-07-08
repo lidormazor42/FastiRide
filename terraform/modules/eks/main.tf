@@ -184,7 +184,14 @@ resource "aws_iam_role" "backend_irsa" {
       }
       Condition = {
         StringEquals = {
-          "${local.oidc_issuer}:sub" = "system:serviceaccount:fastiride-prod:backend"
+          # A list here means "any of these" — lets the same role/IRSA identity
+          # serve the backend ServiceAccount in both the staging and prod
+          # namespaces, instead of provisioning (and trust-policy-wiring) a
+          # second IAM role just for staging.
+          "${local.oidc_issuer}:sub" = [
+            "system:serviceaccount:fastiride-prod:backend",
+            "system:serviceaccount:fastiride-staging:backend",
+          ]
           "${local.oidc_issuer}:aud" = "sts.amazonaws.com"
         }
       }
