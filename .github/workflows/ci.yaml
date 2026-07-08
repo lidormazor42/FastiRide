@@ -67,9 +67,15 @@ jobs:
       id-token: write   # needed for OIDC auth (alternative to static keys)
 
     steps:
+      # Uses a personal token (repo owner), not the default GITHUB_TOKEN — main
+      # is a protected branch requiring a PR, and GitHub doesn't support bypass
+      # actors (apps/teams) on personal (non-org) repos. The repo owner's own
+      # token is exempt from that rule (enforce_admins: false on the branch
+      # protection config), so this is what lets the automated image-tag-bump
+      # commit below actually land on main.
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_PAT }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
