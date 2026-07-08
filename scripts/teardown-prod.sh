@@ -16,13 +16,15 @@ helm uninstall fastiride -n fastiride-prod 2>/dev/null || echo "    (already rem
 echo "==> Waiting 30s for the ALB and its security groups to fully delete"
 sleep 30
 
-echo "==> Running terraform destroy (VPC + EKS only — ECR, GitHub OIDC role, and DNS zone stay alive, they cost ~\$0.50/month total)"
-terraform destroy -var-file="dev.tfvars" -target=module.vpc -target=module.eks
+echo "==> Running terraform destroy (VPC + EKS + RDS — ECR, GitHub OIDC role, and DNS zone stay alive, they cost ~\$0.50/month total)"
+echo "    RDS deletion (skip_final_snapshot) takes a few minutes on its own — this step will wait for it."
+terraform destroy -var-file="dev.tfvars" -target=module.vpc -target=module.eks -target=module.rds
 
 echo "==> Verifying no compute is left running (ECR, GitHub OIDC role, and DNS zone are expected to remain)"
 terraform state list
 
 echo "==> Done. Check AWS directly if you want extra confidence:"
 echo "    aws eks list-clusters   (should be empty)"
+echo "    aws rds describe-db-instances   (should be empty — RDS billing is per-hour just like EC2, don't leave it running)"
 echo "    aws ec2 describe-instances --filters Name=instance-state-name,Values=running,pending   (should be empty)"
-echo "    aws ec2 describe-volumes --filters Name=status,Values=available   (Prometheus/Loki/Grafana PVCs are EBS-CSI dynamic, same orphan risk as Postgres — check this every time)"
+echo "    aws ec2 describe-volumes --filters Name=status,Values=available   (Prometheus/Loki/Grafana PVCs are EBS-CSI dynamic, still an orphan risk — check every time)"

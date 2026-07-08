@@ -47,8 +47,8 @@ resource "aws_iam_role_policy" "backend_uploads" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = ["s3:PutObject", "s3:GetObject"]
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:GetObject"]
         Resource = "${aws_s3_bucket.tickets.arn}/*"
       },
       {

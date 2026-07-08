@@ -11,8 +11,13 @@ CLUSTER_NAME=$(terraform output -raw eks_cluster_name)
 VPC_ID=$(terraform output -raw vpc_id)
 LBC_ROLE_ARN=$(terraform output -raw lbc_role_arn)
 DNS_ZONE_ID=$(terraform output -raw dns_zone_id)
+RDS_ENDPOINT=$(terraform output -raw rds_endpoint)
+RDS_SSM_PARAM=$(terraform output -raw rds_ssm_password_parameter)
 AWS_REGION="us-east-1"
 ALB_HOSTED_ZONE_ID="Z35SXDOTRQ7X7K"   # fixed AWS constant for ALBs in us-east-1
+
+echo "==> Reading RDS master password from SSM"
+RDS_PASSWORD=$(aws ssm get-parameter --name "$RDS_SSM_PARAM" --with-decryption --region "$AWS_REGION" --query "Parameter.Value" --output text)
 
 echo "==> Connecting kubectl to $CLUSTER_NAME"
 aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
@@ -50,8 +55,7 @@ ALERTMANAGER_SMTP_PASSWORD=$(grep '^ALERTMANAGER_SMTP_PASSWORD=' .env | cut -d= 
 echo "==> Creating fastiride-secrets"
 kubectl create secret generic fastiride-secrets \
   --namespace fastiride-prod \
-  --from-literal=database-url="postgresql://fastiride:fastiride-dev-2026@postgres.fastiride-prod.svc.cluster.local:5432/fastiride" \
-  --from-literal=postgres-password="fastiride-dev-2026" \
+  --from-literal=database-url="postgresql://fastiride:${RDS_PASSWORD}@${RDS_ENDPOINT}/fastiride" \
   --from-literal=session-secret="dev-session-secret-change-in-prod" \
   --from-literal=google-client-id="$GOOGLE_CLIENT_ID" \
   --from-literal=google-client-secret="$GOOGLE_CLIENT_SECRET" \

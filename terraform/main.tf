@@ -9,6 +9,10 @@ terraform {
       source  = "hashicorp/tls"
       version = "~> 4.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 
   backend "s3" {
@@ -52,14 +56,14 @@ module "ecr" {
 module "eks" {
   source = "./modules/eks"
 
-  environment         = var.environment
-  vpc_id              = module.vpc.vpc_id
-  subnet_ids          = module.vpc.private_subnet_ids   # nodes in private subnets
-  kubernetes_version  = var.kubernetes_version
-  node_instance_type  = var.node_instance_type
-  node_desired_size   = var.node_desired_size
-  node_min_size       = var.node_min_size
-  node_max_size       = var.node_max_size
+  environment        = var.environment
+  vpc_id             = module.vpc.vpc_id
+  subnet_ids         = module.vpc.private_subnet_ids # nodes in private subnets
+  kubernetes_version = var.kubernetes_version
+  node_instance_type = var.node_instance_type
+  node_desired_size  = var.node_desired_size
+  node_min_size      = var.node_min_size
+  node_max_size      = var.node_max_size
 }
 
 # ── GitHub OIDC — lets GitHub Actions push to ECR without static AWS keys ─────
@@ -92,4 +96,14 @@ module "dns" {
   source = "./modules/dns"
 
   domain_name = "fastiride.app"
+}
+
+# ── RDS — managed PostgreSQL, replaces the K8s StatefulSet ────────────────────
+module "rds" {
+  source = "./modules/rds"
+
+  environment        = var.environment
+  vpc_id             = module.vpc.vpc_id
+  vpc_cidr           = var.vpc_cidr
+  private_subnet_ids = module.vpc.private_subnet_ids
 }

@@ -60,3 +60,13 @@ output "dns_name_servers" {
   description = "Paste these into Name.com to delegate fastiride.app to Route 53"
   value       = module.dns.name_servers
 }
+
+output "rds_endpoint" {
+  description = "RDS Postgres endpoint (host:port) — bootstrap-prod.sh builds DATABASE_URL from this"
+  value       = module.rds.endpoint
+}
+
+output "rds_ssm_password_parameter" {
+  description = "SSM parameter name holding the RDS master password"
+  value       = module.rds.ssm_password_parameter_name
+}

@@ -98,7 +98,7 @@ resource "aws_instance" "nat" {
   instance_type          = "t3.micro"
   subnet_id              = aws_subnet.public[0].id
   vpc_security_group_ids = [aws_security_group.nat.id]
-  source_dest_check      = false   # must be false to forward packets
+  source_dest_check      = false # must be false to forward packets
 
   user_data = base64encode(<<-EOF
     #!/bin/bash
