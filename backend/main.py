@@ -874,3 +874,4 @@ async def ride_chat(websocket: WebSocket, ride_id: int, db: Session = Depends(ge
             })
     except WebSocketDisconnect:
         chat_rooms.disconnect(ride_id, websocket)
+# CI/GitOps trigger — protected-branch bypass verification
