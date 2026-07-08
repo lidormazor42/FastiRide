@@ -4,7 +4,7 @@ backend:
     roleArn: "arn:aws:iam::439594592108:role/fastiride-dev-backend-irsa"
 
 frontend:
-  replicas: 1
+  replicas: 2 # stateless (nginx serving static files) — safe to run >1, unlike backend
 
 ingress:
   host: fastiride.app
