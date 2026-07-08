@@ -1,0 +1,137 @@
+# ספר הפרויקט — FastiRide
+
+פרויקט גמר DevOps: אפליקציה עובדת, בקונטיינרים, פרוסה לקלאסטר Kubernetes מנוהל (AWS EKS), עם CI/CD ו-GitOps מלאים, וניטור אמיתי — הכל מוגדר כקוד.
+
+---
+
+## 1. מבוא לפרויקט
+
+FastiRide היא פלטפורמת שיתוף נסיעות לפסטיבלים — נהגים מפרסמים נסיעה, משתתפים אחרים מצטרפים אליה, וצ'אט פרטי נפתח בין הנהג לנוסעים המאושרים. האפליקציה עצמה היא כלי להדגמת פרויקט DevOps מלא — הדגש הוא על **איך** היא בנויה, נבדקת, נפרסת ומנוטרת, לא רק על מה שהיא עושה.
+
+## 2. מטרת המערכת
+
+להקים ולתפעל אפליקציה אמיתית בסביבת DevOps מלאה: מקוד מקומי, דרך Docker ו-Kubernetes, עם pipeline אוטומטי לחלוטין (push → build → deploy), ותשתית שכולה מוגדרת כקוד (Terraform) — כולל את שכבת הניטור עצמה, לא רק את האפליקציה.
+
+## 3. הסבר על האפליקציה
+
+- **Frontend:** HTML/JS פשוט מוגש דרך Nginx — בלי build step, כדי לשמור את ה-container קטן.
+- **Backend:** FastAPI (Python), עם endpoints ל-אירועים, נסיעות, הצטרפות/אישור, צ'אט (WebSocket), ואימות כרטיסים (AWS Rekognition).
+- **Database:** Amazon RDS ל-PostgreSQL (במקור היה StatefulSet בתוך הקלאסטר — עבר מיגרציה אמיתית, ראו סעיף 13).
+- **אימות:** Google OAuth, session מבוסס JWT ב-cookie.
+- **התראות:** Amazon SES למיילים לנהגים כשמישהו מצטרף/מבטל.
+
+## 4. ארכיטקטורת המערכת
+
+דיאגרמה מלאה + טבלת סביבות + לוג החלטות FinOps נמצאים ב-[README.md](README.md#architecture) (Mermaid diagram שמוצג ישירות ב-GitHub). בקצרה: VPC עם 2 Availability Zones, subnets ציבוריים (ALB + NAT Instance) ו-subnets פרטיים (EKS nodes + RDS), ALB אחד משותף בין האפליקציה ל-Grafana, ו-Route 53 ל-`fastiride.app`.
+
+## 5. הסבר על כל כלי
+
+| כלי | תפקיד בפועל בפרויקט |
+|---|---|
+| **Docker** | אורז את ה-backend וה-frontend ל-images עצמאיים, אותו image רץ מקומית (docker compose) ובענן (EKS) |
+| **Kubernetes (EKS)** | מריץ את ה-pods, שומר עליהם חיים (self-healing), מנתב תעבורה (Service/Ingress), ומאפשר לגדול (replicas) |
+| **Helm** | "תבנית" אחת לכל המניפסטים של Kubernetes, עם קובץ values שונה לכל סביבה (dev מקומי מול prod ב-AWS) |
+| **Terraform** | מגדיר כל משאב ב-AWS כקוד — VPC, EKS, RDS, S3, IAM, Route53 — כדי שהתשתית תהיה נבנית-מחדש ובת-שחזור, לא "נלחצה" ב-console |
+| **GitHub Actions** | ה-CI: על כל push — lint, הרצת בדיקות (pytest), בניית images, דחיפה ל-ECR |
+| **ArgoCD** | ה-CD: קורא את המצב הרצוי מ-Git ומיישם אותו על הקלאסטר לבד — לא ה-CI "דוחף" לקלאסטר, אלא ArgoCD "מושך" מ-Git |
+| **Prometheus** | אוסף מדדים (metrics) — גם על הקלאסטר עצמו וגם על ה-backend (endpoint ייעודי `/metrics`) |
+| **Grafana** | מציג את המדדים כדשבורדים — כולל דשבורד מותאם אישית שבניתי לפי שיטת RED (Rate/Errors/Duration) |
+| **Loki** | אוסף לוגים מכל ה-pods (חלופה קלה יותר ל-Elasticsearch) |
+| **Alertmanager** | שולח **מייל אמיתי** כשמשהו לא תקין — לא רק "יש דשבורד שאיש לא מסתכל עליו" |
+
+## 6. תהליך העבודה
+
+עבודה לפי GitFlow: ענף `develop` לפיתוח שוטף, `feature/*` קצרים לכל שינוי, Pull Request חזרה ל-`develop` (מריץ lint+tests), ומיזוג ל-`main` כשמוכן לעלות בפועל — `main` הוא מה ש-ArgoCD עוקב אחריו, כל merge אליו הוא deploy אמיתי.
+
+## 7. Pipeline (CI/CD)
+
+`.github/workflows/ci.yaml` — שלושה jobs:
+1. **Lint** — `ruff` על קוד ה-Python.
+2. **Test** — `pytest` על סוויטת בדיקות אמיתית (backend/tests/) — מריץ מול sqlite בזיכרון, לא תלוי בשום שירות חיצוני.
+3. **Build & Push** (רק על push ל-`main`, ורק אם שני הקודמים עברו) — בונה image ל-backend ול-frontend, דוחף ל-ECR, ואז **מעדכן את tag ה-image בקובץ ה-Helm values ב-Git עצמו** (לא נוגע בקלאסטר!) — זה ה"טריגר" ש-ArgoCD מזהה ומסנכרן ממנו.
+
+## 8. Kubernetes
+
+משאבים בשימוש: `Deployment` (backend, frontend — עם resources requests/limits אמיתיים), `Service`, `Ingress` (עם AWS Load Balancer Controller, ALB אחד משותף לאפליקציה ול-Grafana), `HPA` (מוגדר, כבוי כברירת מחדל בפרויקט קטן זה), ו-`CronJob` (גיבוי יומי של ה-DB ל-S3). **Pod** הוא יחידת הריצה הבסיסית (container אחד או יותר, רשת/אחסון משותפים); **Deployment** שומר על מספר replicas רצוי ומחליף pods שנופלים; **Service** נותן DNS/IP יציב לקבוצת pods גם כשהם מוחלפים.
+
+## 9. Docker
+
+Dockerfile ייעודי ל-backend ול-frontend. ה-backend דורש ספריות מערכת (`libzbar0`, `tesseract-ocr`) לפני `pip install` — לכן ה-image נבנה בשכבות (system deps → python deps → קוד), כדי ש-Docker ישתמש ב-cache וידלג על שלבים שלא השתנו. ה-image הזהה בדיוק רץ גם מקומית (docker compose) וגם בענן — זה כל הפואנטה של containers: "עובד אצלי" הופך ל"עובד בכל מקום".
+
+## 10. Terraform
+
+כל התשתית תחת `terraform/`, עם state מרוחק ב-S3 (לא local state file). מודולים: `vpc`, `eks`, `rds`, `uploads` (S3), `dns` (Route53), `github-oidc`, `budget-alerts`, `ses-alerting`. כל מודול אחראי על משאב AWS אחד — לא קובץ ענק אחד עם הכל מעורבב.
+
+## 11. Monitoring
+
+Prometheus + Grafana + Loki + Alertmanager — **כולם עצמם פרוסים דרך ArgoCD**, לא helm ידני, כדי לשמור על עקביות GitOps גם עבור התשתית שמנטרת את האפליקציה. דשבורד מותאם אישית (`fastiride-backend`) בנוי על מדדים אמיתיים מה-backend (לא רק דשבורד קהילתי גנרי). Alertmanager מחובר בפועל ל-SES ושולח מייל אמיתי — לא רק "יש alert rules שאף אחד לא רואה".
+
+## 12. Screenshots
+
+ראו `docs/images/` (רשימת הצילומים הנדרשים מפורטת ב-[README](README.md#screenshots)) — לוח הנסיעות, ArgoCD עם כל האפליקציות Synced/Healthy, שני דשבורדי Grafana, ריצת CI ירוקה, ומסך ה-RDS.
+
+## 13. בעיות ופתרונות
+
+זה החלק המעניין באמת — לא "הכל עבד מהפעם הראשונה", אלא סדרת תקלות אמיתיות שנתקלתי בהן ופתרתי:
+
+**תקלת עלות — קלאסטר נטוש בפרנקפורט ($153).** בדיקת חיוב AWS שגרתית חשפה קלאסטר EKS מלא שרץ ב-`eu-central-1` במשך כחודש, לא מנוהל ב-Terraform בכלל. אומת דרך Route53 שהוא לא משרת תעבורה אמיתית, ונמחק. **לקח:** בדיקת עלויות חייבת לסרוק כמה regions, לא רק את זה שבשימוש.
+
+**באג IRSA — הרשאות AWS מעולם לא עבדו בפועל.** ה-trust policy של ה-IAM role לבקנד הצביע על namespace שגוי (`fastiride` במקום `fastiride-prod`) — כל קריאה ל-Rekognition/S3 נכשלה בשקט ונפלה חזרה ל-OCR מקומי, בלי הודעת שגיאה גלויה. התגלה רק כשבדקתי לוגים תוך כדי בדיקה חיה על AWS — לא מספיק לבדוק ב-Docker מקומי בלבד.
+
+**ArgoCD selfHeal מוחק שינויים ידניים.** תיקון שהוחל ישירות דרך `helm upgrade` (בלי git push) נמחק תוך דקה על ידי ה-sync האוטומטי של ArgoCD, כי הוא קורא את המצב הרצוי **מ-Git בלבד**. הלקח חזר על עצמו כמה פעמים באותה צורה — Git הוא מקור האמת היחיד, אין "לתקן מהר בצד".
+
+**404 שקטים על ה-health check של ה-ALB.** ה-Load Balancer בדק ברירת מחדל את הנתיב `/` על ה-backend — אבל ה-API לא מגדיר route כזה בכלל. כל בדיקה נכשלה ב-404 כל 10-30 שניות, מה שזיהם את מדדי השגיאות (44% error rate מדומה!) בלי שום השפעה אמיתית על המשתמשים. תוקן עם annotation ממוקד רק ל-Service של ה-backend.
+
+**באג מיזוג Helm ב-Alertmanager.** Helm ממזג dictionaries אך **מחליף arrays לגמרי**. הגדרת `receivers` מותאמת אישית מחקה בטעות receiver בשם `"null"` שחוק ברירת המחדל (השתקת התראת Watchdog) עדיין הצביע עליו — Alertmanager פשוט לא עלה, עד שהוחזר receiver תואם.
+
+**PVC יתומים — שלוש פעמים.** `helm uninstall` לא מוחק PVC-ים שנוצרו דרך StatefulSet — קרה עם Postgres, ואז שוב עם Prometheus/Loki אחרי מעבר ל-ArgoCD. לקח: כל migration/uninstall של StatefulSet חייב בדיקת `kubectl get pvc` נפרדת, לא לסמוך על ניקוי אוטומטי.
+
+**Deadlock בפריסה של Grafana.** Volume מסוג `ReadWriteOnce` + אסטרטגיית ברירת המחדל `RollingUpdate` (עם replica יחיד) יוצרים מבוי סתום — ה-pod החדש לא יכול לתפוס את ה-volume כל עוד הישן מחזיק בו, אבל הישן לא מתבטל עד שהחדש מוכן. פתרון: `strategy.type: Recreate`.
+
+**Node לא הצליח להצטרף לקלאסטר.** בניסיון להעלות את מגבלת ה-pods per-node (מ-17 ל-110, דרך prefix delegation), Terraform apply נכשל: `User data was not in the MIME multipart format`. EKS דורש עטיפת MIME multipart ספציפית סביב הגדרת ה-NodeConfig, לא YAML גולמי — גם אם הוא תקין. תוקן, ואומת: שני ה-nodes עלו עם קיבולת 110 pods במקום 17.
+
+**מיגרציה ל-RDS.** במקור Postgres רץ כ-StatefulSet בתוך הקלאסטר (כדי לחסוך עלות בשלב הפיתוח המהיר). לקראת ההגשה, בוצעה מיגרציה מלאה ל-RDS מנוהל: מודול Terraform חדש, סיסמה שנוצרת אקראית ונשמרת ב-SSM Parameter Store (לא בקוד), עדכון סקריפטי ה-bootstrap/teardown, והסרת ה-StatefulSet מה-Helm chart. אומת מקצה לקצה: 7 הטבלאות נוצרו נכון על ה-RDS דרך ה-migration הפנימי של האפליקציה.
+
+## 14. תמונות קוד
+
+מומלץ לצלם ולהוסיף כאן קטעי קוד מייצגים מהריפו:
+- `backend/main.py` — חיבור ה-`/metrics` endpoint (`Instrumentator().instrument(app).expose(app)`)
+- `helm/fastiride/templates/postgres-backup-cronjob.yaml` — ה-CronJob המלא
+- `terraform/modules/rds/main.tf` — הגדרת ה-RDS
+- `terraform/ses-alerting.tf` — זהות ה-SES וה-IAM user ל-Alertmanager
+- `.github/workflows/ci.yaml` — ה-pipeline המלא (lint → test → build → GitOps bump)
+- `backend/tests/test_join_flow.py` — דוגמה לבדיקת unit test אמיתית
+
+## 15. סיכום אישי
+
+_(לכתוב אישית — מה למדת, מה היה הכי מאתגר, מה היית עושה אחרת בפעם הבאה)_
+
+---
+
+## נספח: הכנה לשאלות הבוחן
+
+תשובות מקושרות ישירות לפרויקט הזה, לא הגדרות כלליות מהאינטרנט:
+
+**מה Docker עושה?**
+אורז את האפליקציה (קוד + תלויות + ספריות מערכת כמו `libzbar0`) ל-image אחד עצמאי, שרץ זהה בכל מקום — אצלי מקומית ובענן זה בדיוק אותו `fastiride-backend` image.
+
+**למה Kubernetes?**
+כי EC2 בודד לא מחזיר את עצמו לחיים כשהוא קורס. Kubernetes שומר על מספר replicas רצוי (backend, frontend), מנתב תעבורה גם כש-pods מוחלפים (Service), ומאפשר deploy בלי downtime (rolling update).
+
+**מה קורה כשעושים Push?**
+ל-`develop`/`main`: GitHub Actions מריץ lint ואז pytest. אם שניהם עוברים ורק אם ה-push הוא ל-`main` — בונה images, דוחף ל-ECR, ומעדכן את ה-tag בקובץ Helm values **ב-Git עצמו** (לא נוגע בקלאסטר ישירות).
+
+**איך מתבצע Deployment?**
+ArgoCD סורק את ה-repo כל ~2 דקות, ורואה שקובץ ה-values השתנה (tag חדש) — מיישם את זה לקלאסטר לבד. אני אף פעם לא מריץ `kubectl apply` או `helm upgrade` ידנית בפרודקשן.
+
+**למה Terraform?**
+כי אחרת התשתית קיימת רק "בראש שלי" ובקונסולת AWS — בלתי אפשרי לשחזר, לבדוק, או להסביר במדויק מה קיים ולמה. עם Terraform, `terraform destroy` ואז `terraform apply` בונים בדיוק אותה תשתית מחדש.
+
+**איך Grafana מתחברת?**
+דרך שני datasources מוגדרים מראש (Prometheus ל-metrics, Loki ל-logs) — כתובות ה-Service הפנימיות שלהם בקלאסטר (`monitoring-prometheus-kube-prometheus.monitoring.svc.cluster.local:9090` וכו').
+
+**מה ArgoCD עושה?**
+"מושך" את המצב הרצוי מ-Git ומיישם אותו — בניגוד ל-CI ש"דוחף". ArgoCD גם מזהה סטייה (drift) בין מה שרץ בפועל למה שכתוב ב-Git ומתקן אותה אוטומטית (`selfHeal`) — נתקלתי בזה בפועל כשתיקון ידני שלא הגיע ל-Git נמחק תוך דקה.
+
+**איך המערכת מתעדכנת לבד?**
+לולאת ה-GitOps: push → CI בונה ומעדכן tag ב-Git → ArgoCD מזהה ומסנכרן. אף אדם לא נוגע בקלאסטר בין השלבים האלה.
