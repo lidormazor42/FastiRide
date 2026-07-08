@@ -21,11 +21,39 @@ prometheus:
         static_configs:
           - targets: ["backend.fastiride-prod.svc.cluster.local:8000"]
 
-# Disabled — nothing is configured to receive alerts (no Slack/PagerDuty), and it was
-# using up a pod slot on a node already at its 17-pod capacity limit. Re-enable + configure
-# a real receiver (route.receiver) if/when actual alerting is needed.
+# Re-enabled with a real email receiver via SES SMTP (terraform/ses-alerting.tf).
+# NOTE: this adds back the pod slot we freed earlier — check node pod counts
+# (`kubectl describe nodes`) after this deploys; may need the VPC CNI prefix-delegation
+# fix if a node is at its 17-pod cap again.
 alertmanager:
-  enabled: false
+  enabled: true
+  alertmanagerSpec:
+    # Mounted at /etc/alertmanager/secrets/alertmanager-ses-smtp/ — created by
+    # bootstrap-prod.sh from .env, same pattern as fastiride-secrets / grafana-admin-credentials.
+    secrets:
+      - alertmanager-ses-smtp
+  config:
+    global:
+      resolve_timeout: 5m
+      smtp_smarthost: "email-smtp.us-east-1.amazonaws.com:587"
+      smtp_from: "lidormazor42@gmail.com"
+      # This is the IAM Access Key ID (an identifier, not the secret itself — the actual
+      # secret is the derived SMTP password below, which IS file-mounted from a Secret).
+      # Fill in with the `alertmanager_ses_smtp_username` terraform output after apply.
+      smtp_auth_username: "REPLACE_WITH_TERRAFORM_OUTPUT"
+      smtp_auth_password_file: /etc/alertmanager/secrets/alertmanager-ses-smtp/smtp-password
+      smtp_require_tls: true
+    route:
+      receiver: "email-alerts"
+      group_by: ["alertname"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+    receivers:
+      - name: "email-alerts"
+        email_configs:
+          - to: "lidormazor42@gmail.com"
+            send_resolved: true
 
 nodeExporter:
   enabled: true

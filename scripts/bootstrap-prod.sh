@@ -45,6 +45,7 @@ echo "==> Loading secrets from .env"
 cd ..
 GOOGLE_CLIENT_ID=$(grep '^GOOGLE_CLIENT_ID=' .env | cut -d= -f2-)
 GOOGLE_CLIENT_SECRET=$(grep '^GOOGLE_CLIENT_SECRET=' .env | cut -d= -f2-)
+ALERTMANAGER_SMTP_PASSWORD=$(grep '^ALERTMANAGER_SMTP_PASSWORD=' .env | cut -d= -f2-)
 
 echo "==> Creating fastiride-secrets"
 kubectl create secret generic fastiride-secrets \
@@ -62,6 +63,12 @@ kubectl create secret generic grafana-admin-credentials \
   --namespace monitoring \
   --from-literal=admin-user="admin" \
   --from-literal=admin-password="1324" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+echo "==> Creating alertmanager-ses-smtp (Alertmanager email notifications)"
+kubectl create secret generic alertmanager-ses-smtp \
+  --namespace monitoring \
+  --from-literal=smtp-password="$ALERTMANAGER_SMTP_PASSWORD" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "==> Deploying FastiRide via Helm"
