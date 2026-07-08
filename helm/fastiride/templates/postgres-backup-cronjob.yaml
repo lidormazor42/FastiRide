@@ -1,0 +1,46 @@
+# Daily pg_dump of RDS to S3. Reuses the backend ServiceAccount (already has
+# S3 PutObject on this bucket via IRSA — see terraform/modules/uploads) instead
+# of creating a new IAM role just for this. No custom image: postgres:16-alpine
+# + `apk add aws-cli` at runtime keeps this to one file, at the cost of a
+# ~10s slower start each run — acceptable for something that runs once a day.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fastiride.labels" . | nindent 4 }}
+spec:
+  schedule: "0 3 * * *" # 03:00 UTC daily
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: backend
+          restartPolicy: OnFailure
+          containers:
+            - name: pg-backup
+              image: postgres:16-alpine
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: fastiride-secrets
+                      key: database-url
+                - name: S3_UPLOADS_BUCKET
+                  value: {{ .Values.config.s3UploadsBucket | quote }}
+              command:
+                - sh
+                - -c
+                - |
+                  set -euo pipefail
+                  apk add --no-cache aws-cli >/dev/null
+                  STAMP=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+                  FILE="/tmp/fastiride-${STAMP}.sql.gz"
+                  pg_dump "$DATABASE_URL" | gzip > "$FILE"
+                  aws s3 cp "$FILE" "s3://${S3_UPLOADS_BUCKET}/db-backups/fastiride-${STAMP}.sql.gz"
+                  echo "Backup uploaded: db-backups/fastiride-${STAMP}.sql.gz"
