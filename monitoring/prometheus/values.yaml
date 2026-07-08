@@ -49,11 +49,21 @@ alertmanager:
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 4h
+      # The chart's default config always includes this child route (Helm deep-merges
+      # dicts, so it survives even though we're overriding `route` above) — it silences
+      # "Watchdog", a constant heartbeat alert kube-prometheus-stack fires on purpose to
+      # prove Alertmanager itself is alive. Without a matching receiver named "null" it
+      # errors out and the whole Alertmanager pod never starts.
+      routes:
+        - receiver: "null"
+          matchers:
+            - alertname = "Watchdog"
     receivers:
       - name: "email-alerts"
         email_configs:
           - to: "lidormazor42@gmail.com"
             send_resolved: true
+      - name: "null"
 
 nodeExporter:
   enabled: true
