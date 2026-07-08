@@ -92,22 +92,27 @@ kubectl create secret generic alertmanager-ses-smtp \
   --from-literal=smtp-password="$ALERTMANAGER_SMTP_PASSWORD" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-echo "==> Deploying FastiRide via Helm (prod + staging)"
-helm upgrade --install fastiride helm/fastiride \
-  -f helm/fastiride/values.yaml \
-  -f helm/fastiride/values-prod.yaml \
-  --namespace fastiride-prod \
-  --wait
-
-helm upgrade --install fastiride-staging helm/fastiride \
-  -f helm/fastiride/values.yaml \
-  -f helm/fastiride/values-staging.yaml \
-  --namespace fastiride-staging \
-  --wait
-
 echo "==> Registering fastiride-prod + fastiride-staging Applications with ArgoCD"
+# No manual `helm upgrade --install` here on purpose — both environments are
+# fully ArgoCD-managed (CreateNamespace=true + automated sync does the whole
+# first deploy from scratch), same as the monitoring stack below. A manual
+# helm command here actively conflicts with ArgoCD's ownership of resources
+# it created itself (hit this for real: postgres-backup CronJob had only
+# ArgoCD's tracking annotation, not Helm's release-ownership one, and
+# `helm upgrade` refused to touch it — "cannot be imported into the current
+# release"). Let ArgoCD be the only thing that ever applies these manifests.
 kubectl apply -f k8s/argocd/app-prod.yaml
 kubectl apply -f k8s/argocd/app-staging.yaml
+
+echo "==> Waiting for ArgoCD to finish the initial sync of both apps"
+for app in fastiride-prod fastiride-staging; do
+  echo "    ...$app"
+  for i in $(seq 1 30); do
+    STATUS=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.sync.status}/{.status.health.status}' 2>/dev/null || true)
+    [ "$STATUS" = "Synced/Healthy" ] && break
+    sleep 5
+  done
+done
 
 echo "==> Registering monitoring stack (Prometheus, Loki, Grafana) with ArgoCD"
 kubectl apply -f k8s/argocd/app-monitoring-prometheus.yaml
