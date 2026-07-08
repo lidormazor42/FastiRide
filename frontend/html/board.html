@@ -350,7 +350,7 @@
   <nav class="sticky top-0 z-20 nav-glass" style="position:sticky;z-index:20;">
     <div class="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
 
-      <a href="/" style="display:flex;align-items:center;gap:.6rem;text-decoration:none;transition:opacity .2s;" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">
+      <a href="/app" style="display:flex;align-items:center;gap:.6rem;text-decoration:none;transition:opacity .2s;" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">
         <div style="width:30px;height:30px;border-radius:8px;background:rgba(255,51,0,.12);border:1px solid rgba(255,51,0,.3);display:flex;align-items:center;justify-content:center;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
             <polygon points="12,11 4.2,0.9 6.6,0.2" fill="#ffe066" opacity=".85"/>
@@ -642,7 +642,7 @@
 
     <!-- Footer -->
     <div style="text-align:center;padding-bottom:3rem;position:relative;z-index:1;">
-      <a href="/" style="font-size:.75rem;color:#444444;text-decoration:none;transition:color .2s;"
+      <a href="/app" style="font-size:.75rem;color:#444444;text-decoration:none;transition:color .2s;"
          onmouseover="this.style.color='#94a3b8'" onmouseout="this.style.color='#444444'">← חזרה לדף הבית</a>
     </div>
   </div>
@@ -1406,7 +1406,7 @@
     async function handleLogout() {
       await fetch('/api/auth/logout', { method: 'POST' });
       sessionStorage.clear();
-      window.location.href = '/';
+      window.location.href = '/app';
     }
 
     /* ── Init handled above inside async user-fetch block ── */

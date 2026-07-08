@@ -145,7 +145,7 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    redirect = RedirectResponse("/")
+    redirect = RedirectResponse("/app")
     redirect.set_cookie(
         "session", _make_token(user.id),
         httponly=True, samesite="lax", max_age=30 * 24 * 3600, path="/",
