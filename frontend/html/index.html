@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,11 4.2,0.9 6.6,0.2' fill='%23ffe066'/%3E%3Cpolygon points='12,11 10.9,0 13.1,0' fill='%23ff6a00'/%3E%3Cpolygon points='12,11 17.4,0.2 19.8,0.9' fill='%23ffb238'/%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%23f5f5f5' stroke-width='1.8'/%3E%3Ccircle cx='12' cy='12' r='2.8' fill='%23ff3300'/%3E%3C/svg%3E" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FastiRide — טרמפים לאירועים ופסטיבלים</title>
+  <meta name="description" content="פלטפורמת שיתוף נסיעות לאירועים ופסטיבלים — מעלים כרטיס, מוצאים טרמפ, ומתחברים לפני שמגיעים." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:      #0A0A0A;
+      --fire:    #FF3300;
+      --fire-d:  #E52B00;
+      --gold:    #FFB238;
+      --amber:   #FF6A00;
+      --yellow:  #FFE066;
+      --rose:    #F43F5E;
+      --text:    #F5F5F5;
+      --muted:   #94A3B8;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Rubik', 'Heebo', -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      overflow-x: hidden;
+    }
+
+    a { cursor: pointer; }
+    a:focus-visible, button:focus-visible {
+      outline: 2px solid var(--fire);
+      outline-offset: 3px;
+      border-radius: .3rem;
+    }
+
+    /* ── Aurora background ──────────────────────────────────────── */
+    .stage {
+      position: relative;
+      min-height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .aurora {
+      position: fixed;
+      inset: -20%;
+      z-index: 0;
+      pointer-events: none;
+      filter: blur(60px);
+      opacity: .55;
+      background: conic-gradient(from 0deg at 50% 40%,
+        var(--fire) 0deg,
+        var(--rose) 70deg,
+        transparent 140deg,
+        var(--gold) 220deg,
+        var(--amber) 280deg,
+        var(--fire) 360deg);
+      animation: spin 22s linear infinite;
+      will-change: transform;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .vignette {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      background: radial-gradient(ellipse at 50% 35%, transparent 0%, rgba(10,10,10,.55) 55%, var(--bg) 100%);
+    }
+
+    .beam {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(70px);
+      opacity: .35;
+      z-index: 0;
+      pointer-events: none;
+      will-change: transform;
+    }
+    .beam-a { width: 46vw; height: 46vw; top: -10%; right: -8%;  background: var(--yellow); animation: float-a 14s ease-in-out infinite; }
+    .beam-b { width: 40vw; height: 40vw; bottom: -12%; left: -10%; background: var(--fire);   animation: float-b 17s ease-in-out infinite; }
+    .beam-c { width: 30vw; height: 30vw; top: 30%; left: 55%;    background: var(--amber);  animation: float-c 12s ease-in-out infinite; }
+
+    @keyframes float-a { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-4%, 5%) scale(1.08); } }
+    @keyframes float-b { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(5%, -4%) scale(1.1); } }
+    @keyframes float-c { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-6%, -6%) scale(.92); } }
+
+    /* ── Hero ────────────────────────────────────────────────────── */
+    .hero {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 760px;
+      padding: 5.5rem 1.5rem 3rem;
+      text-align: center;
+    }
+
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: .5rem;
+      background: rgba(255,178,56,.08);
+      border: 1px solid rgba(255,178,56,.3);
+      border-radius: 999px;
+      padding: .4rem 1.1rem;
+      font-size: .78rem; font-weight: 700; color: var(--gold);
+      margin-bottom: 1.5rem;
+      letter-spacing: -.005em;
+    }
+
+    /* ── Decorative party symbols ───────────────────────────────── */
+    .party-icon {
+      position: fixed;
+      z-index: 1;
+      pointer-events: none;
+      opacity: .22;
+      will-change: transform;
+    }
+    .icon-ticket   { top: 16%; left: 9%;  color: var(--gold);   animation: float-a 13s ease-in-out infinite; }
+    .icon-pin      { top: 68%; left: 13%; color: var(--fire);   animation: float-c 15s ease-in-out infinite; }
+    .icon-disco    { top: 12%; right: 10%; color: var(--rose);  animation: spin-slow 30s linear infinite; }
+    .icon-beat     { bottom: 14%; right: 12%; color: var(--amber); }
+    .icon-beat rect { animation: beat-bounce 1.6s ease-in-out infinite; transform-origin: bottom center; }
+    .icon-beat rect:nth-child(2) { animation-delay: .2s; }
+    .icon-beat rect:nth-child(3) { animation-delay: .4s; }
+    @keyframes spin-slow { to { transform: rotate(360deg); } }
+    @keyframes beat-bounce { 0%,100% { transform: scaleY(.4); } 50% { transform: scaleY(1); } }
+
+    .logo-mark {
+      width: 96px; height: 96px;
+      margin: 0 auto 1.75rem;
+      border-radius: 26px;
+      background: rgba(255,51,0,.12);
+      border: 1.5px solid rgba(255,51,0,.4);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 0 1px rgba(255,178,56,.15), 0 0 60px rgba(255,51,0,.45);
+      animation: pulse-ring 3.4s ease-in-out infinite;
+    }
+    @keyframes pulse-ring {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(255,178,56,.15), 0 0 40px rgba(255,51,0,.35); }
+      50%      { box-shadow: 0 0 0 1px rgba(255,178,56,.3),  0 0 78px rgba(255,51,0,.65); }
+    }
+
+    .headline {
+      font-weight: 900;
+      font-size: clamp(2.6rem, 9vw, 5.5rem);
+      letter-spacing: -.03em;
+      line-height: 1.02;
+      margin: 0 0 1rem;
+      background: linear-gradient(90deg, var(--yellow), var(--amber), var(--fire), var(--rose), var(--amber), var(--yellow));
+      background-size: 300% auto;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: gradient-sweep 6s linear infinite;
+      text-shadow: 0 0 70px rgba(255,90,0,.35);
+    }
+    @keyframes gradient-sweep {
+      to { background-position: 300% center; }
+    }
+
+    .tagline {
+      font-size: clamp(1.05rem, 2.6vw, 1.4rem);
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 .6rem;
+      letter-spacing: -.01em;
+    }
+    .subtext {
+      font-size: .95rem;
+      color: var(--muted);
+      max-width: 480px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.6;
+    }
+
+    /* ── CTA ─────────────────────────────────────────────────────── */
+    .cta {
+      display: inline-flex; align-items: center; gap: .6rem;
+      font-family: inherit; font-weight: 800; font-size: 1.05rem;
+      color: #fff; text-decoration: none;
+      padding: 1.05rem 2.5rem;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--fire), var(--fire-d));
+      box-shadow: 0 0 0 0 rgba(255,51,0,.6);
+      animation: cta-pulse 2.4s ease-in-out infinite;
+      transition: transform .18s ease;
+    }
+    .cta:hover  { transform: translateY(-2px) scale(1.02); }
+    .cta:active { transform: scale(.98); }
+    .cta svg { transition: transform .18s ease; }
+    .cta:hover svg { transform: translateX(-4px); }
+    @keyframes cta-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255,51,0,.55); }
+      50%      { box-shadow: 0 0 0 14px rgba(255,51,0,0); }
+    }
+
+    .live-badge {
+      display: inline-flex; align-items: center; gap: .5rem;
+      margin-top: 2.25rem;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 999px;
+      padding: .5rem 1.15rem;
+      font-size: .8rem; color: var(--muted); font-weight: 500;
+    }
+    .live-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: #22c55e; flex-shrink: 0;
+      animation: dot-pulse 2s infinite;
+    }
+    @keyframes dot-pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+    /* ── Feature strip ───────────────────────────────────────────── */
+    .features {
+      position: relative; z-index: 2;
+      width: 100%; max-width: 900px;
+      padding: 1rem 1.5rem 5rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+    }
+    .feature-card {
+      background: rgba(255,255,255,.035);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 1.25rem;
+      padding: 1.6rem 1.4rem;
+      text-align: right;
+      backdrop-filter: blur(6px);
+      transition: border-color .2s ease, transform .2s ease;
+    }
+    .feature-card:hover { border-color: rgba(255,51,0,.4); transform: translateY(-3px); }
+    .feature-icon {
+      width: 42px; height: 42px; border-radius: 12px;
+      background: rgba(255,51,0,.1);
+      border: 1px solid rgba(255,51,0,.28);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .feature-card h3 { font-size: 1rem; font-weight: 800; margin: 0 0 .4rem; color: var(--text); }
+    .feature-card p  { font-size: .82rem; color: var(--muted); line-height: 1.6; margin: 0; }
+
+    footer {
+      position: relative; z-index: 2;
+      font-size: .75rem; color: #444; padding-bottom: 2rem; text-align: center;
+    }
+
+    /* ── Accessibility: respect reduced motion ──────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      .aurora, .beam, .logo-mark, .headline, .cta, .live-dot,
+      .party-icon, .icon-disco, .icon-beat rect {
+        animation: none !important;
+      }
+      .headline { background-position: 0 center; }
+    }
+
+    /* Decorative symbols add visual noise on small screens without adding meaning */
+    @media (max-width: 700px) {
+      .party-icon { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="aurora" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="beam beam-a" aria-hidden="true"></div>
+    <div class="beam beam-b" aria-hidden="true"></div>
+    <div class="beam beam-c" aria-hidden="true"></div>
+
+    <!-- Decorative festival symbols — purely atmospheric, not informational -->
+    <svg class="party-icon icon-ticket" aria-hidden="true" width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
+    </svg>
+    <svg class="party-icon icon-pin" aria-hidden="true" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/>
+    </svg>
+    <svg class="party-icon icon-disco" aria-hidden="true" width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4v16M6.5 6.5l11 11M17.5 6.5l-11 11"/>
+    </svg>
+    <svg class="party-icon icon-beat" aria-hidden="true" width="40" height="30" viewBox="0 0 24 18" fill="currentColor">
+      <rect x="2" y="4" width="4" height="14" rx="1"/><rect x="10" y="0" width="4" height="18" rx="1"/><rect x="18" y="6" width="4" height="12" rx="1"/>
+    </svg>
+
+    <main class="hero">
+      <div class="logo-mark" aria-hidden="true">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+          <polygon points="12,11 4.2,0.9 6.6,0.2" fill="#ffe066" opacity=".85"/>
+          <polygon points="12,11 10.9,0 13.1,0" fill="#ff6a00" opacity=".95"/>
+          <polygon points="12,11 17.4,0.2 19.8,0.9" fill="#ffb238" opacity=".85"/>
+          <circle cx="12" cy="12" r="9" stroke="#f5f5f5" stroke-width="1.3"/>
+          <line x1="3.9" y1="12" x2="9.7" y2="12" stroke="#f5f5f5" stroke-width="1.1" stroke-linecap="round"/>
+          <line x1="14.3" y1="12" x2="20.1" y2="12" stroke="#f5f5f5" stroke-width="1.1" stroke-linecap="round"/>
+          <line x1="12" y1="14.3" x2="12" y2="20.1" stroke="#f5f5f5" stroke-width="1.1" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="2.3" fill="#ff3300"/>
+        </svg>
+      </div>
+
+      <div class="eyebrow">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg>
+        <span>פלטפורמת שיתוף נסיעות לפסטיבלים ומסיבות</span>
+      </div>
+
+      <h1 class="headline">FastiRide</h1>
+      <p class="tagline">מחברים בין אנשים שנוסעים לאותו אירוע</p>
+      <p class="subtext">מעלים כרטיס לאירוע, מוצאים נהג או נוסעים באזור שלכם, ומתאמים הכל דרך צ'אט קבוצתי. בלי לחפש טרמפים בקבוצות וואטסאפ, בלי להגיע לבד.</p>
+
+      <a href="/app" class="cta">
+        <span>התחל</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      </a>
+
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        <span>פלטפורמה פעילה · אירועים קרובים זמינים עכשיו</span>
+      </div>
+    </main>
+
+    <section class="features" aria-label="למה FastiRide">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <h3>מוצאים טרמפ תוך שניות</h3>
+        <p>מעלים כרטיס, בוחרים אירוע, ורואים מיד מי נוסע לאותו מקום.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
+        </div>
+        <h3>הכרטיס שלכם הוא הכניסה</h3>
+        <p>מעלים צילום מסך של הכרטיס לאירוע, ומיד נפתחת לכם קבוצת הטרמפים של אותה מסיבה.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        </div>
+        <h3>צ'אט חי עם הנהג</h3>
+        <p>מתאמים נקודת איסוף ומכירים את חברי הנסיעה עוד לפני שיוצאים.</p>
+      </div>
+    </section>
+
+    <footer>FastiRide © 2026</footer>
+  </div>
+
+</body>
+</html>
