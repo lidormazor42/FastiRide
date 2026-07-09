@@ -17,8 +17,9 @@ FastiRide היא פלטפורמת שיתוף נסיעות לפסטיבלים —
 - **Frontend:** HTML/JS פשוט מוגש דרך Nginx — בלי build step, כדי לשמור את ה-container קטן.
 - **Backend:** FastAPI (Python), עם endpoints ל-אירועים, נסיעות, הצטרפות/אישור, צ'אט (WebSocket), ואימות כרטיסים (AWS Rekognition).
 - **Database:** Amazon RDS ל-PostgreSQL (במקור היה StatefulSet בתוך הקלאסטר — עבר מיגרציה אמיתית, ראו סעיף 13).
-- **אימות:** Google OAuth, session מבוסס JWT ב-cookie.
-- **התראות:** Amazon SES למיילים לנהגים כשמישהו מצטרף/מבטל.
+- **אימות:** Google OAuth, session מבוסס JWT ב-cookie (המפתח החותם נשמר ב-SSM Parameter Store, לא בקוד).
+- **התראות:** Amazon SES למיילים לנהגים כשמישהו מצטרף/מבטל — תבניות HTML ממותגות בעיצוב האתר.
+- **אימות כרטיסים — החלטת תכנון:** ה-OCR הראשי הוא AWS Rekognition (מנוהל, בלי תלויות native), אבל pytesseract נשאר בכוונה כ-fallback מקומי — כך האפליקציה עובדת גם ב-docker compose מקומי בלי חיבור ל-AWS. זו לא שארית ישנה אלא degradation מדורג מכוון: ענן קודם, מקומי כגיבוי.
 
 ## 4. ארכיטקטורת המערכת
 
@@ -54,6 +55,8 @@ FastiRide היא פלטפורמת שיתוף נסיעות לפסטיבלים —
 
 **`.github/workflows/promote-to-production.yaml`** — רץ **רק** כשדוחפים git tag בפורמט `v*`. לא בונה שום image חדש — קורא את ה-tags הנוכחיים מ-`values-staging.yaml` (מה שכבר רץ ואומת ב-staging) וכותב אותם ל-`values-prod.yaml`. כך production תמיד מריץ בדיוק את מה ש"עבר" ב-staging, לא build עצמאי.
 
+**`.github/workflows/iac-quality.yaml`** — ה-CI של התשתית עצמה, לא רק של הקוד: `terraform fmt -check` + `terraform validate` (רץ בלי credentials בכלל, עם `-backend=false`), `helm lint` מול קבצי ה-values של **שתי** הסביבות, וסריקת אבטחה של **Trivy** — פגיעויות CRITICAL בתלויות Python או misconfigurations ב-Terraform/K8s מפילות את ה-pipeline; ממצאי HIGH מדווחים בלוג לבחינה.
+
 ## 8. Kubernetes
 
 משאבים בשימוש: `Deployment` (backend, frontend — עם resources requests/limits אמיתיים), `Service`, `Ingress` (עם AWS Load Balancer Controller, ALB אחד משותף לאפליקציה ול-Grafana), `HPA` (מוגדר, כבוי כברירת מחדל בפרויקט קטן זה), ו-`CronJob` (גיבוי יומי של ה-DB ל-S3). **Pod** הוא יחידת הריצה הבסיסית (container אחד או יותר, רשת/אחסון משותפים); **Deployment** שומר על מספר replicas רצוי ומחליף pods שנופלים; **Service** נותן DNS/IP יציב לקבוצת pods גם כשהם מוחלפים.
@@ -62,9 +65,13 @@ FastiRide היא פלטפורמת שיתוף נסיעות לפסטיבלים —
 
 Dockerfile ייעודי ל-backend ול-frontend. ה-backend דורש ספריות מערכת (`libzbar0`, `tesseract-ocr`) לפני `pip install` — לכן ה-image נבנה בשכבות (system deps → python deps → קוד), כדי ש-Docker ישתמש ב-cache וידלג על שלבים שלא השתנו. ה-image הזהה בדיוק רץ גם מקומית (docker compose) וגם בענן — זה כל הפואנטה של containers: "עובד אצלי" הופך ל"עובד בכל מקום".
 
+**Hardening:** ה-backend רץ כמשתמש לא-root (`USER appuser` ב-Dockerfile) — אם האפליקציה נפרצת (למשל דרך קובץ תמונה זדוני בהעלאת כרטיס), התוקף לא מקבל root בתוך ה-container. פורט 8000 לא-מיוחס, אז לא נדרש שום שינוי נוסף.
+
 ## 10. Terraform
 
-כל התשתית תחת `terraform/`, עם state מרוחק ב-S3 (לא local state file). מודולים: `vpc`, `eks`, `rds`, `uploads` (S3), `dns` (Route53), `github-oidc`, `budget-alerts`, `ses-alerting`. כל מודול אחראי על משאב AWS אחד — לא קובץ ענק אחד עם הכל מעורבב.
+כל התשתית תחת `terraform/`, עם state מרוחק ב-S3 (לא local state file) **ונעילת state** (`use_lockfile = true` — נעילה native ב-S3 מ-Terraform 1.10, בלי צורך בטבלת DynamoDB) שמונעת משני `apply` מקבילים להשחית את ה-state. מודולים: `vpc`, `eks`, `rds`, `uploads` (S3), `dns` (Route53), `github-oidc`. כל מודול אחראי על משאב AWS אחד — לא קובץ ענק אחד עם הכל מעורבב.
+
+**ניהול סודות — הכל דרך SSM Parameter Store (SecureString):** סיסמת ה-RDS, המפתח שחותם sessions של משתמשים, וסיסמת ה-admin של Grafana — כולם נוצרים ב-`random_password` של Terraform ונשמרים ב-SSM. אף סוד לא מופיע בקוד או ב-Git; סקריפט ה-bootstrap קורא אותם מ-SSM בזמן הקמה ובונה מהם Kubernetes Secrets. (במקור סיסמת Grafana וה-session secret היו hardcoded בסקריפט — זוהה ותוקן ב-audit אבטחה לפני ההגשה.)
 
 ## 11. Monitoring
 
@@ -95,6 +102,12 @@ Prometheus + Grafana + Loki + Alertmanager — **כולם עצמם פרוסים 
 **Node לא הצליח להצטרף לקלאסטר.** בניסיון להעלות את מגבלת ה-pods per-node (מ-17 ל-110, דרך prefix delegation), Terraform apply נכשל: `User data was not in the MIME multipart format`. EKS דורש עטיפת MIME multipart ספציפית סביב הגדרת ה-NodeConfig, לא YAML גולמי — גם אם הוא תקין. תוקן, ואומת: שני ה-nodes עלו עם קיבולת 110 pods במקום 17.
 
 **מיגרציה ל-RDS.** במקור Postgres רץ כ-StatefulSet בתוך הקלאסטר (כדי לחסוך עלות בשלב הפיתוח המהיר). לקראת ההגשה, בוצעה מיגרציה מלאה ל-RDS מנוהל: מודול Terraform חדש, סיסמה שנוצרת אקראית ונשמרת ב-SSM Parameter Store (לא בקוד), עדכון סקריפטי ה-bootstrap/teardown, והסרת ה-StatefulSet מה-Helm chart. אומת מקצה לקצה: 7 הטבלאות נוצרו נכון על ה-RDS דרך ה-migration הפנימי של האפליקציה.
+
+**מיילים לנהגים נכשלו בשקט — מהיום הראשון.** פיצ'ר ההתראות במייל (בקשת הצטרפות לנסיעה) "עבד" לכאורה מאז שנבנה — אבל בפועל אף מייל לא נשלח מעולם: כתובת השולח `noreply@fastiride.app` מעולם לא אומתה ב-SES, וה-`try/except` בקוד בלע את השגיאה ונפל לחלופת console-print. התגלה רק כשמשתמש אמיתי (אני) שם לב שמייל לא הגיע. אבחון: הרצת פונקציית השליחה ישירות בתוך ה-pod (`kubectl exec`) חשפה `Email address is not verified`. פתרון: אימות **הדומיין כולו** ב-SES דרך DKIM — שלוש רשומות CNAME ב-Route53, הכל ב-Terraform (`ses-domain.tf`), בלי שום קליק ידני. **שני לקחים:** (1) fallback שקט מדי מסתיר תקלות — הוא נועד לפיתוח מקומי אבל הסווה כשל אמיתי בפרודקשן; (2) בדיקה פונקציונלית אמיתית (המייל הגיע?) שווה יותר מקוד שנראה תקין.
+
+**קונפליקט בעלות בין Helm ל-ArgoCD.** סקריפט ה-bootstrap הריץ `helm upgrade --install` על release שבפועל היה מנוהל כולו על ידי ArgoCD — והתקבלה שגיאת `invalid ownership metadata: missing key "meta.helm.sh/release-name"`. הסיבה: משאב שנוצר על ידי ArgoCD מקבל רק את annotation המעקב של ArgoCD, לא את annotations הבעלות של Helm — ולכן Helm מסרב "לאמץ" אותו. תיקון נקודתי: הוספת ה-annotations ידנית. תיקון מבני: הסרת פקודות ה-helm הידניות מהסקריפט לגמרי — ArgoCD הוא הכותב **היחיד** של המניפסטים האלה, מהפריסה הראשונה ועד הסוף. שני כלים שמנהלים אותו משאב זה תמיד באג שמחכה לקרות.
+
+**CI לא הצליח לדחוף ל-branch מוגן.** אחרי הפעלת branch protection על `main` (חובת PR), ה-job שמעדכן את tag ה-image ב-Git נכשל עם `GH006: Protected branch update failed` — ה-`GITHUB_TOKEN` המובנה של Actions כפוף לחוקי ההגנה, וב-repo אישי (לא ארגוני) GitHub לא תומך בהגדרת bypass ל-apps. הפתרון: שימוש ב-Personal Access Token של בעל ה-repo (secret בשם `GH_PAT`) בשלב ה-checkout — הטוקן של הבעלים עצמו פטור מחובת ה-PR (כש-`enforce_admins` כבוי). שלושה ניסיונות `gh api` נכשלו עד שהתבררה הסמנטיקה המדויקת של ה-API הזה על repos אישיים.
 
 ## 14. תמונות קוד
 
@@ -139,3 +152,12 @@ ArgoCD סורק את ה-repo כל ~2 דקות, ורואה שקובץ ה-values �
 
 **איך המערכת מתעדכנת לבד?**
 לולאת ה-GitOps: push → CI בונה ומעדכן tag ב-Git → ArgoCD מזהה ומסנכרן. אף אדם לא נוגע בקלאסטר בין השלבים האלה.
+
+**איפה הסודות של המערכת?**
+ב-AWS SSM Parameter Store, כ-SecureString: סיסמת RDS, מפתח חתימת ה-sessions, סיסמת Grafana. נוצרים על ידי Terraform (`random_password`), נקראים על ידי סקריפט ה-bootstrap שבונה מהם Kubernetes Secrets. שום סוד לא נמצא ב-Git — ה-`.env` המקומי ב-`.gitignore`, וההרשאות בקלאסטר מבוססות IRSA (תפקיד IAM לכל ServiceAccount) בלי מפתחות סטטיים.
+
+**מה קורה אם ה-DB נמחק?**
+CronJob יומי מריץ `pg_dump`, דוחס ומעלה ל-S3 (`db-backups/`), עם ההרשאות של אותו IRSA role שכבר יש ל-backend (בלי IAM חדש). בנוסף, RDS מנוהל עם גיבויים אוטומטיים של AWS. השחזור: `pg_restore` מהקובץ האחרון ב-S3.
+
+**איך אתה יודע שהמערכת בריאה עכשיו?**
+שלוש שכבות: probes של Kubernetes (liveness/readiness על כל pod), דשבורד RED ב-Grafana (Rate/Errors/Duration על ה-API האמיתי), ו-Alertmanager ששולח מייל אמיתי דרך SES אם alert נדלק — כולל alert על backend שלא מגיב.

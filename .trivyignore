@@ -1,0 +1,6 @@
+# smtp_auth_username in monitoring/prometheus/values.yaml is an AWS Access Key
+# ID (AKIA...) used as the SES SMTP username. An access key ID is an
+# identifier, not a credential — the paired secret key lives only in the
+# alertmanager-ses-smtp Kubernetes Secret (created at bootstrap from SSM/.env,
+# never in Git), and the IAM user behind it can do nothing but ses:SendRawEmail.
+aws-access-key-id
