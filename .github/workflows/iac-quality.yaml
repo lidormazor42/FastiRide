@@ -57,7 +57,7 @@ jobs:
       # Terraform/K8s manifests for misconfigurations. CRITICAL findings fail
       # the pipeline; HIGH and below are reported in the job log for review.
       - name: Trivy — fail on CRITICAL vulnerabilities
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -67,7 +67,7 @@ jobs:
 
       - name: Trivy — report HIGH findings (informational)
         if: always()
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
