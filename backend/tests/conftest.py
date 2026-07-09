@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 import models
 import main
+import email_service
 from database import Base, engine, SessionLocal
 
 
@@ -17,6 +18,21 @@ def _fresh_db():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield
+
+
+@pytest.fixture(autouse=True)
+def _no_real_emails(monkeypatch):
+    """Tests must NEVER send real email. Learned the hard way: running pytest
+    inside the local backend container (which loads real Gmail SMTP creds from
+    .env) sent actual join-notification emails to driver@example.com — Gmail
+    bounced every one back into a real inbox as 'Undeliverable'. Patching
+    email_service._send covers every notification type in one place."""
+    sent = []
+    monkeypatch.setattr(
+        email_service, "_send",
+        lambda to, subject, html: sent.append((to, subject)),
+    )
+    return sent
 
 
 @pytest.fixture
