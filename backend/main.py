@@ -145,7 +145,7 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    redirect = RedirectResponse("/")
+    redirect = RedirectResponse("/app")
     redirect.set_cookie(
         "session", _make_token(user.id),
         httponly=True, samesite="lax", max_age=30 * 24 * 3600, path="/",
@@ -618,11 +618,18 @@ def get_my_pending_requests(session: str = Cookie(default=None), db: Session = D
         .order_by(models.RideRequest.created_at.desc())
         .all()
     )
+    passenger_emails = {r.passenger_email for r in requests if r.passenger_email}
+    passengers_by_email = {
+        u.email: u
+        for u in db.query(models.User).filter(models.User.email.in_(passenger_emails)).all()
+    } if passenger_emails else {}
     return [
         {
             "id": r.id,
             "ride_id": r.ride_id,
             "passenger_name": r.passenger_name,
+            "passenger_photo": passengers_by_email.get(r.passenger_email).picture if r.passenger_email in passengers_by_email else None,
+            "passenger_age": passengers_by_email.get(r.passenger_email).age if r.passenger_email in passengers_by_email else None,
             "created_at": r.created_at,
             "ride_city": r.ride.city,
             "ride_departure_time": r.ride.departure_time,

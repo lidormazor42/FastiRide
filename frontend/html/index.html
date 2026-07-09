@@ -4,1226 +4,349 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,11 4.2,0.9 6.6,0.2' fill='%23ffe066'/%3E%3Cpolygon points='12,11 10.9,0 13.1,0' fill='%23ff6a00'/%3E%3Cpolygon points='12,11 17.4,0.2 19.8,0.9' fill='%23ffb238'/%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%23f5f5f5' stroke-width='1.8'/%3E%3Ccircle cx='12' cy='12' r='2.8' fill='%23ff3300'/%3E%3C/svg%3E" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FastiRide</title>
+  <title>FastiRide — טרמפים לאירועים ופסטיבלים</title>
+  <meta name="description" content="פלטפורמת שיתוף נסיעות לאירועים ופסטיבלים — מעלים כרטיס, מוצאים טרמפ, ומתחברים לפני שמגיעים." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root {
-      --bg:        #0A0A0A;
-      --surface:   #141414;
-      --border:    #252525;
-      --fire:      #FF3300;
-      --fire-d:    #E52B00;
-      --green:     #22C55E;
-      --rose:      #EF4444;
-      --text:      #F5F5F5;
-      --muted:     #666666;
+      --bg:      #0A0A0A;
+      --fire:    #FF3300;
+      --fire-d:  #E52B00;
+      --gold:    #FFB238;
+      --amber:   #FF6A00;
+      --yellow:  #FFE066;
+      --rose:    #F43F5E;
+      --text:    #F5F5F5;
+      --muted:   #94A3B8;
     }
 
     * { box-sizing: border-box; }
 
-    body {
+    html, body {
       background: var(--bg);
       color: var(--text);
       font-family: 'Rubik', 'Heebo', -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      overflow-x: hidden;
+    }
+
+    a { cursor: pointer; }
+    a:focus-visible, button:focus-visible {
+      outline: 2px solid var(--fire);
+      outline-offset: 3px;
+      border-radius: .3rem;
+    }
+
+    /* ── Aurora background ──────────────────────────────────────── */
+    .stage {
+      position: relative;
       min-height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
-    /* ── Grid canvas bg ─────────────────────────── */
-    #grid-canvas {
-      position: fixed; top:0; left:0; width:100%; height:100%;
-      z-index: 0; pointer-events: none;
-    }
-
-    /* ── 3D card tilt ───────────────────────────── */
-    .role-card {
-      transform-style: preserve-3d;
+    .aurora {
+      position: fixed;
+      inset: -20%;
+      z-index: 0;
+      pointer-events: none;
+      filter: blur(60px);
+      opacity: .55;
+      background: conic-gradient(from 0deg at 50% 40%,
+        var(--fire) 0deg,
+        var(--rose) 70deg,
+        transparent 140deg,
+        var(--gold) 220deg,
+        var(--amber) 280deg,
+        var(--fire) 360deg);
+      animation: spin 22s linear infinite;
       will-change: transform;
     }
-
-    /* ── Animations ─────────────────────────────── */
-    @keyframes fadeUp {
-      from { opacity:0; transform:translateY(18px); }
-      to   { opacity:1; transform:translateY(0); }
-    }
-    @keyframes dotPulse {
-      0%,100% { opacity:1; }
-      50%      { opacity:.3; }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
-    .fade-up  { animation:fadeUp .6s ease-out both; }
-    .delay-1  { animation-delay:.1s; }
-    .delay-2  { animation-delay:.2s; }
-    .delay-3  { animation-delay:.35s; }
-    .delay-4  { animation-delay:.5s; }
-
-    /* ── Logo ───────────────────────────────────── */
-    .logo-text { color: #F5F5F5; font-family: 'Rubik', sans-serif; }
-
-    /* ── Live badge ─────────────────────────────── */
-    .glass-surface {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 999px;
+    .vignette {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      background: radial-gradient(ellipse at 50% 35%, transparent 0%, rgba(10,10,10,.55) 55%, var(--bg) 100%);
     }
 
-    /* ── Role card ──────────────────────────────── */
-    .role-card {
-      background: var(--surface);
-      border: 1.5px solid var(--border);
-      border-radius: 1.5rem;
-      padding: 2rem;
-      cursor: pointer;
-      text-align: right;
-      transition: transform .22s ease, box-shadow .22s ease, border-color .18s ease;
+    .beam {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(70px);
+      opacity: .35;
+      z-index: 0;
+      pointer-events: none;
+      will-change: transform;
+    }
+    .beam-a { width: 46vw; height: 46vw; top: -10%; right: -8%;  background: var(--yellow); animation: float-a 14s ease-in-out infinite; }
+    .beam-b { width: 40vw; height: 40vw; bottom: -12%; left: -10%; background: var(--fire);   animation: float-b 17s ease-in-out infinite; }
+    .beam-c { width: 30vw; height: 30vw; top: 30%; left: 55%;    background: var(--amber);  animation: float-c 12s ease-in-out infinite; }
+
+    @keyframes float-a { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-4%, 5%) scale(1.08); } }
+    @keyframes float-b { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(5%, -4%) scale(1.1); } }
+    @keyframes float-c { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-6%, -6%) scale(.92); } }
+
+    /* ── Hero ────────────────────────────────────────────────────── */
+    .hero {
       position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 760px;
+      padding: 5.5rem 1.5rem 3rem;
+      text-align: center;
     }
-    .role-card::before { display: none; }
-    .role-card:hover { transform: translateY(-5px); box-shadow: 0 20px 50px rgba(0,0,0,.5); }
-    .role-card.role-attendee:hover { border-color: #FF3300; }
-    .role-card.role-organizer:hover { border-color: #F97316; }
-    .role-card .card-glow-strip { display: none; }
-    .role-card .icon-wrap {
-      width: 52px; height: 52px; border-radius: 14px;
+
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: .5rem;
+      background: rgba(255,178,56,.08);
+      border: 1px solid rgba(255,178,56,.3);
+      border-radius: 999px;
+      padding: .4rem 1.1rem;
+      font-size: .78rem; font-weight: 700; color: var(--gold);
+      margin-bottom: 1.5rem;
+      letter-spacing: -.005em;
+    }
+
+    /* ── Decorative party symbols ───────────────────────────────── */
+    .party-icon {
+      position: fixed;
+      z-index: 1;
+      pointer-events: none;
+      opacity: .22;
+      will-change: transform;
+    }
+    .icon-ticket   { top: 16%; left: 9%;  color: var(--gold);   animation: float-a 13s ease-in-out infinite; }
+    .icon-pin      { top: 68%; left: 13%; color: var(--fire);   animation: float-c 15s ease-in-out infinite; }
+    .icon-disco    { top: 12%; right: 10%; color: var(--rose);  animation: spin-slow 30s linear infinite; }
+    .icon-beat     { bottom: 14%; right: 12%; color: var(--amber); }
+    .icon-beat rect { animation: beat-bounce 1.6s ease-in-out infinite; transform-origin: bottom center; }
+    .icon-beat rect:nth-child(2) { animation-delay: .2s; }
+    .icon-beat rect:nth-child(3) { animation-delay: .4s; }
+    @keyframes spin-slow { to { transform: rotate(360deg); } }
+    @keyframes beat-bounce { 0%,100% { transform: scaleY(.4); } 50% { transform: scaleY(1); } }
+
+    .logo-mark {
+      width: 96px; height: 96px;
+      margin: 0 auto 1.75rem;
+      border-radius: 26px;
+      background: rgba(255,51,0,.12);
+      border: 1.5px solid rgba(255,51,0,.4);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 0 1px rgba(255,178,56,.15), 0 0 60px rgba(255,51,0,.45);
+      animation: pulse-ring 3.4s ease-in-out infinite;
+    }
+    @keyframes pulse-ring {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(255,178,56,.15), 0 0 40px rgba(255,51,0,.35); }
+      50%      { box-shadow: 0 0 0 1px rgba(255,178,56,.3),  0 0 78px rgba(255,51,0,.65); }
+    }
+
+    .headline {
+      font-weight: 900;
+      font-size: clamp(2.6rem, 9vw, 5.5rem);
+      letter-spacing: -.03em;
+      line-height: 1.02;
+      margin: 0 0 1rem;
+      background: linear-gradient(90deg, var(--yellow), var(--amber), var(--fire), var(--rose), var(--amber), var(--yellow));
+      background-size: 300% auto;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: gradient-sweep 6s linear infinite;
+      text-shadow: 0 0 70px rgba(255,90,0,.35);
+    }
+    @keyframes gradient-sweep {
+      to { background-position: 300% center; }
+    }
+
+    .tagline {
+      font-size: clamp(1.05rem, 2.6vw, 1.4rem);
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 .6rem;
+      letter-spacing: -.01em;
+    }
+    .subtext {
+      font-size: .95rem;
+      color: var(--muted);
+      max-width: 480px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.6;
+    }
+
+    /* ── CTA ─────────────────────────────────────────────────────── */
+    .cta {
+      display: inline-flex; align-items: center; gap: .6rem;
+      font-family: inherit; font-weight: 800; font-size: 1.05rem;
+      color: #fff; text-decoration: none;
+      padding: 1.05rem 2.5rem;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--fire), var(--fire-d));
+      box-shadow: 0 0 0 0 rgba(255,51,0,.6);
+      animation: cta-pulse 2.4s ease-in-out infinite;
+      transition: transform .18s ease;
+    }
+    .cta:hover  { transform: translateY(-2px) scale(1.02); }
+    .cta:active { transform: scale(.98); }
+    .cta svg { transition: transform .18s ease; }
+    .cta:hover svg { transform: translateX(-4px); }
+    @keyframes cta-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255,51,0,.55); }
+      50%      { box-shadow: 0 0 0 14px rgba(255,51,0,0); }
+    }
+
+    .live-badge {
+      display: inline-flex; align-items: center; gap: .5rem;
+      margin-top: 2.25rem;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 999px;
+      padding: .5rem 1.15rem;
+      font-size: .8rem; color: var(--muted); font-weight: 500;
+    }
+    .live-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: #22c55e; flex-shrink: 0;
+      animation: dot-pulse 2s infinite;
+    }
+    @keyframes dot-pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+    /* ── Feature strip ───────────────────────────────────────────── */
+    .features {
+      position: relative; z-index: 2;
+      width: 100%; max-width: 900px;
+      padding: 1rem 1.5rem 5rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+    }
+    .feature-card {
+      background: rgba(255,255,255,.035);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 1.25rem;
+      padding: 1.6rem 1.4rem;
+      text-align: right;
+      backdrop-filter: blur(6px);
+      transition: border-color .2s ease, transform .2s ease;
+    }
+    .feature-card:hover { border-color: rgba(255,51,0,.4); transform: translateY(-3px); }
+    .feature-icon {
+      width: 42px; height: 42px; border-radius: 12px;
       background: rgba(255,51,0,.1);
       border: 1px solid rgba(255,51,0,.28);
       display: flex; align-items: center; justify-content: center;
-      margin-bottom: 1.5rem;
-      transition: transform .22s ease;
+      margin-bottom: 1rem;
     }
-    .role-card.role-organizer .icon-wrap {
-      background: rgba(249,115,22,.1);
-      border-color: rgba(249,115,22,.28);
-    }
-    .role-card:hover .icon-wrap { transform: scale(1.1); }
+    .feature-card h3 { font-size: 1rem; font-weight: 800; margin: 0 0 .4rem; color: var(--text); }
+    .feature-card p  { font-size: .82rem; color: var(--muted); line-height: 1.6; margin: 0; }
 
-    /* ── Form panel ─────────────────────────────── */
-    .form-panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 1.25rem;
+    footer {
+      position: relative; z-index: 2;
+      font-size: .75rem; color: #444; padding-bottom: 2rem; text-align: center;
     }
 
-    /* ── Inputs ─────────────────────────────────── */
-    .field {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      border-radius: .75rem;
-      padding: .6rem 1rem;
-      font-size: .875rem;
-      font-family: inherit;
-      width: 100%;
-      transition: border-color .2s, box-shadow .2s;
-    }
-    .field::placeholder { color: #444444; }
-    .field:focus { outline: none; border-color: #FF3300; box-shadow: 0 0 0 3px rgba(255,51,0,.12); }
-    select.field { cursor: pointer; appearance: none; }
-    input[type="date"].field::-webkit-calendar-picker-indicator { filter: invert(.5); cursor: pointer; }
-
-    /* ── Event cards picker ─────────────────────── */
-    .event-card {
-      display: flex; align-items: center; gap: .875rem;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: .9rem;
-      padding: .8rem 1rem;
-      cursor: pointer;
-      transition: border-color .2s;
-      animation: fadeUp .5s ease-out both;
-    }
-    .event-card:hover { border-color: rgba(255,51,0,.4); }
-    .event-card.selected { border-color: #FF3300; background: rgba(255,51,0,.06); }
-    .event-bolt {
-      width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0;
-      background: rgba(255,51,0,.1);
-      border: 1px solid rgba(255,51,0,.25);
-      display: flex; align-items: center; justify-content: center;
-    }
-    .event-card.selected .event-bolt { background: rgba(255,51,0,.2); }
-    .event-card .check-badge {
-      width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
-      background: rgba(34,197,94,.15);
-      border: 1px solid rgba(34,197,94,.5);
-      display: flex; align-items: center; justify-content: center;
-      opacity: 0; transform: scale(.5);
-      transition: opacity .2s, transform .2s;
-    }
-    .event-card.selected .check-badge { opacity: 1; transform: scale(1); }
-    .event-skeleton {
-      height: 64px; border-radius: .9rem;
-      background: var(--surface);
-      animation: skeletonPulse 1.6s ease-in-out infinite;
-    }
-    @keyframes skeletonPulse {
-      0%,100% { opacity: .35; }
-      50%      { opacity: .7; }
+    /* ── Accessibility: respect reduced motion ──────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      .aurora, .beam, .logo-mark, .headline, .cta, .live-dot,
+      .party-icon, .icon-disco, .icon-beat rect {
+        animation: none !important;
+      }
+      .headline { background-position: 0 center; }
     }
 
-    /* ── Primary button ─────────────────────────── */
-    .btn-primary {
-      width: 100%; border: none; cursor: pointer;
-      font-family: inherit; font-weight: 700; font-size: .9rem;
-      padding: .9rem; border-radius: .875rem;
-      background: #FF3300;
-      color: #fff;
-      transition: background .18s, transform .15s;
-    }
-    .btn-primary:hover:not(:disabled) { background: #E52B00; transform: translateY(-1px); }
-    .btn-primary:active:not(:disabled) { transform: scale(.98); }
-    .btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
-
-    /* ── Google button ──────────────────────────── */
-    .btn-google {
-      display: flex; align-items: center; justify-content: center; gap: .75rem;
-      width: 100%; border: none; cursor: pointer;
-      font-family: inherit; font-weight: 600; font-size: .875rem;
-      padding: .875rem; border-radius: .875rem;
-      background: #fff; color: #111827;
-      transition: transform .2s, box-shadow .2s;
-      text-decoration: none;
-    }
-    .btn-google:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,0,0,.3); }
-
-    /* ── Step indicators ────────────────────────── */
-    .step-active {
-      width: 26px; height: 26px; border-radius: 50%;
-      background: #FF3300;
-      display: flex; align-items: center; justify-content: center;
-      color: #fff; font-size: .72rem; font-weight: 800;
-      flex-shrink: 0;
-    }
-    .step-done {
-      width: 26px; height: 26px; border-radius: 50%;
-      background: #22C55E;
-      display: flex; align-items: center; justify-content: center;
-      color: #fff; font-size: .7rem; font-weight: 700; flex-shrink: 0;
-    }
-    .step-idle {
-      width: 26px; height: 26px; border-radius: 50%;
-      background: var(--surface); border: 1.5px solid var(--border);
-      display: flex; align-items: center; justify-content: center;
-      color: #444444; font-size: .72rem; font-weight: 700; flex-shrink: 0;
-    }
-
-    /* ── Section header ─────────────────────────── */
-    .section-label {
-      font-size: .78rem; font-weight: 700; color: var(--muted);
-      margin-bottom: 1rem; text-transform: uppercase; letter-spacing: .04em;
+    /* Decorative symbols add visual noise on small screens without adding meaning */
+    @media (max-width: 700px) {
+      .party-icon { display: none; }
     }
   </style>
 </head>
-<body style="display:flex;align-items:flex-start;justify-content:center;padding:3.5rem 1rem 5rem;position:relative;overflow-x:hidden;">
+<body>
 
-  <!-- Synthwave perspective grid -->
-  <canvas id="grid-canvas"></canvas>
+  <div class="stage">
+    <div class="aurora" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="beam beam-a" aria-hidden="true"></div>
+    <div class="beam beam-b" aria-hidden="true"></div>
+    <div class="beam beam-c" aria-hidden="true"></div>
 
-  <div style="position:relative;width:100%;max-width:640px;z-index:1;">
+    <!-- Decorative festival symbols — purely atmospheric, not informational -->
+    <svg class="party-icon icon-ticket" aria-hidden="true" width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
+    </svg>
+    <svg class="party-icon icon-pin" aria-hidden="true" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 21s-7-6.5-7-11a7 7 0 1 1 14 0c0 4.5-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/>
+    </svg>
+    <svg class="party-icon icon-disco" aria-hidden="true" width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4v16M6.5 6.5l11 11M17.5 6.5l-11 11"/>
+    </svg>
+    <svg class="party-icon icon-beat" aria-hidden="true" width="40" height="30" viewBox="0 0 24 18" fill="currentColor">
+      <rect x="2" y="4" width="4" height="14" rx="1"/><rect x="10" y="0" width="4" height="18" rx="1"/><rect x="18" y="6" width="4" height="12" rx="1"/>
+    </svg>
 
-    <!-- ══════════════════════════════════════════
-         STEP 1 — Landing
-    ══════════════════════════════════════════ -->
-    <div data-step="landing">
-
-      <!-- Hero -->
-      <div style="text-align:center;margin-bottom:3rem;" class="fade-up">
-        <div style="display:inline-flex;align-items:center;gap:.875rem;margin-bottom:1.25rem;">
-          <div style="width:56px;height:56px;border-radius:16px;background:rgba(255,51,0,.12);border:1.5px solid rgba(255,51,0,.35);display:flex;align-items:center;justify-content:center;">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-              <polygon points="12,11 4.2,0.9 6.6,0.2" fill="#ffe066" opacity=".8"/>
-              <polygon points="12,11 10.9,0 13.1,0" fill="#ff6a00" opacity=".9"/>
-              <polygon points="12,11 17.4,0.2 19.8,0.9" fill="#ffb238" opacity=".8"/>
-              <circle cx="12" cy="12" r="9" stroke="#f5f5f5" stroke-width="1.3"/>
-              <line x1="3.9" y1="12" x2="9.7" y2="12" stroke="#f5f5f5" stroke-width="1.1" stroke-linecap="round"/>
-              <line x1="14.3" y1="12" x2="20.1" y2="12" stroke="#f5f5f5" stroke-width="1.1" stroke-linecap="round"/>
-              <line x1="12" y1="14.3" x2="12" y2="20.1" stroke="#f5f5f5" stroke-width="1.1" stroke-linecap="round"/>
-              <circle cx="12" cy="12" r="2.3" fill="#ff3300"/>
-            </svg>
-          </div>
-          <span class="logo-text" style="font-size:3.2rem;font-weight:900;letter-spacing:-.04em;">FastiRide</span>
-        </div>
-        <p style="font-size:1rem;color:#94a3b8;font-weight:500;letter-spacing:-.01em;">פלטפורמת שיתוף נסיעות לאירועים ופסטיבלים</p>
-        <p style="font-size:.82rem;color:#4a5568;margin-top:.5rem;font-weight:500;">מי אתה היום?</p>
+    <main class="hero">
+      <div class="logo-mark" aria-hidden="true">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+          <polygon points="12,11 4.2,0.9 6.6,0.2" fill="#ffe066" opacity=".85"/>
+          <polygon points="12,11 10.9,0 13.1,0" fill="#ff6a00" opacity=".95"/>
+          <polygon points="12,11 17.4,0.2 19.8,0.9" fill="#ffb238" opacity=".85"/>
+          <circle cx="12" cy="12" r="9" stroke="#f5f5f5" stroke-width="1.3"/>
+          <line x1="3.9" y1="12" x2="9.7" y2="12" stroke="#f5f5f5" stroke-width="1.1" stroke-linecap="round"/>
+          <line x1="14.3" y1="12" x2="20.1" y2="12" stroke="#f5f5f5" stroke-width="1.1" stroke-linecap="round"/>
+          <line x1="12" y1="14.3" x2="12" y2="20.1" stroke="#f5f5f5" stroke-width="1.1" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="2.3" fill="#ff3300"/>
+        </svg>
       </div>
 
-      <!-- Role cards -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;" class="fade-up delay-2">
-
-        <!-- Attendee card -->
-        <button onclick="handleAttendeeClick()" class="role-card role-attendee" style="border:none;">
-          <div class="card-glow-strip"></div>
-          <div class="icon-wrap">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 11l19-9-9 19-2-8-8-2z"/>
-            </svg>
-          </div>
-          <h2 style="font-size:1.25rem;font-weight:800;color:#F5F5F5;margin-bottom:.5rem;letter-spacing:-.02em;">אני מגיע לאירוע</h2>
-          <p style="font-size:.84rem;color:#666666;line-height:1.65;margin-bottom:1.75rem;">העלה כרטיס פסטיבל ומצא או פרסם נסיעה משותפת.</p>
-          <div style="display:inline-flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:700;color:#FF3300;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.3);border-radius:999px;padding:.35rem .9rem;">
-            <span>התחל</span>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-          </div>
-        </button>
-
-        <!-- Organizer card -->
-        <button onclick="handleOrganizerClick()" class="role-card role-organizer" style="border:none;">
-          <div class="card-glow-strip"></div>
-          <div class="icon-wrap">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-            </svg>
-          </div>
-          <h2 style="font-size:1.25rem;font-weight:800;color:#F5F5F5;margin-bottom:.5rem;letter-spacing:-.02em;">אני מפיק אירוע</h2>
-          <p style="font-size:.84rem;color:#666666;line-height:1.65;margin-bottom:1.75rem;">רשום את האירוע שלך ותן לקהל שלך למצוא ולתאם טרמפים.</p>
-          <div style="display:inline-flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:700;color:#F97316;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.28);border-radius:999px;padding:.35rem .9rem;">
-            <span>הגדר אירוע</span>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-          </div>
-        </button>
-
+      <div class="eyebrow">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg>
+        <span>פלטפורמת שיתוף נסיעות לפסטיבלים ומסיבות</span>
       </div>
 
-      <!-- Live badge -->
-      <div style="display:flex;justify-content:center;margin-top:2rem;" class="fade-up delay-4">
-        <div class="glass-surface" style="display:inline-flex;align-items:center;gap:.5rem;border-radius:999px;padding:.45rem 1.1rem;">
-          <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0;animation:dotPulse 2s infinite;"></span>
-          <span style="font-size:.75rem;color:#64748b;font-weight:500;">פלטפורמה פעילה · אירועים קרובים זמינים</span>
-        </div>
+      <h1 class="headline">FastiRide</h1>
+      <p class="tagline">מחברים בין אנשים שנוסעים לאותו אירוע</p>
+      <p class="subtext">מעלים כרטיס לאירוע, מוצאים נהג או נוסעים באזור שלכם, ומתאמים הכל דרך צ'אט קבוצתי. בלי לחפש טרמפים בקבוצות וואטסאפ, בלי להגיע לבד.</p>
+
+      <a href="/app" class="cta">
+        <span>התחל</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      </a>
+
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        <span>פלטפורמה פעילה · אירועים קרובים זמינים עכשיו</span>
       </div>
-    </div>
+    </main>
 
-
-    <!-- ══════════════════════════════════════════
-         STEP 2 — Organizer registration
-    ══════════════════════════════════════════ -->
-    <div data-step="organizer" style="display:none;">
-      <button onclick="goBackFromOrganizerForm()"
-        style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#475569;background:none;border:none;cursor:pointer;font-family:inherit;margin-bottom:2rem;padding:0;transition:color .2s;"
-        onmouseover="this.style.color='#FF6655'" onmouseout="this.style.color='#475569'">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        חזרה
-      </button>
-
-      <div style="margin-bottom:1.75rem;">
-        <h1 id="organizer-title" style="font-size:1.5rem;font-weight:800;color:#f1f5f9;letter-spacing:-.02em;">צור אירוע</h1>
-        <p style="font-size:.83rem;color:#64748b;margin-top:.3rem;">מלא את הפרטים ופתח את קבוצת הטרמפים לאירוע שלך.</p>
+    <section class="features" aria-label="למה FastiRide">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <h3>מוצאים טרמפ תוך שניות</h3>
+        <p>מעלים כרטיס, בוחרים אירוע, ורואים מיד מי נוסע לאותו מקום.</p>
       </div>
-
-      <!-- Owner pill — the event is tied to whichever Google account creates it -->
-      <div class="form-panel" style="padding:1rem 1.25rem;display:flex;align-items:center;gap:.875rem;margin-bottom:1.25rem;">
-        <div id="org-pill-avatar"
-          style="width:42px;height:42px;border-radius:50%;background:#F97316;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.85rem;font-weight:800;flex-shrink:0;overflow:hidden;box-shadow:0 0 0 2px rgba(249,115,22,.3);">G</div>
-        <div>
-          <p id="org-pill-name" style="font-size:.9rem;font-weight:600;color:#f1f5f9;">מחובר</p>
-          <p style="font-size:.72rem;color:#475569;display:flex;align-items:center;gap:.4rem;margin-top:.15rem;">
-            <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;animation:dotPulse 2s infinite;"></span>
-            האירוע ייווצר תחת החשבון הזה
-          </p>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
         </div>
+        <h3>הכרטיס שלכם הוא הכניסה</h3>
+        <p>מעלים צילום מסך של הכרטיס לאירוע, ומיד נפתחת לכם קבוצת הטרמפים של אותה מסיבה.</p>
       </div>
-
-      <form onsubmit="submitOrganizer(event)" style="display:flex;flex-direction:column;gap:.875rem;">
-
-        <div id="org-phone-panel" class="form-panel" style="padding:1.5rem;">
-          <p style="font-size:.78rem;font-weight:700;color:#94a3b8;margin-bottom:.4rem;">פרטי קשר</p>
-          <p style="font-size:.72rem;color:#475569;margin-bottom:1rem;line-height:1.5;">מספר טלפון במידה ונצטרך ליצור קשר.</p>
-          <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">טלפון</label>
-          <input id="org-phone" type="tel" inputmode="tel" placeholder="050-1234567" required class="field" />
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
         </div>
-
-        <div class="form-panel" style="padding:1.5rem;">
-          <p style="font-size:.78rem;font-weight:700;color:#94a3b8;margin-bottom:1rem;">פרטי האירוע</p>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.875rem;">
-            <div>
-              <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">שם האירוע</label>
-              <input id="org-event-name" type="text" placeholder="Psytech 2025" required class="field" />
-            </div>
-            <div>
-              <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">תאריך</label>
-              <input id="org-event-date" type="date" required class="field" />
-            </div>
-            <div>
-              <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">מיקום</label>
-              <input id="org-event-location" type="text" placeholder="הנגב, ישראל" required class="field" />
-            </div>
-            <div style="grid-column:1/-1;">
-              <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">לוגו האירוע</label>
-              <label id="org-logo-label" style="display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;background:rgba(255,51,0,.05);border:1.5px dashed rgba(255,51,0,.3);border-radius:.75rem;cursor:pointer;transition:border-color .2s,background .2s;" onmouseover="this.style.borderColor='rgba(255,51,0,.6)';this.style.background='rgba(255,51,0,.08)'" onmouseout="this.style.borderColor='rgba(255,51,0,.3)';this.style.background='rgba(255,51,0,.05)'">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                <span id="org-logo-name" style="font-size:.8rem;color:#64748b;">העלה לוגו (PNG / JPG)</span>
-                <input id="org-logo" type="file" accept="image/*" style="display:none;" onchange="const f=this.files[0];if(f)document.getElementById('org-logo-name').textContent=f.name;" />
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div id="org-error" style="display:none;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.3);border-radius:.75rem;padding:.75rem 1rem;font-size:.82rem;color:#fb7185;"></div>
-
-        <button type="submit" id="org-submit-btn" class="btn-primary">צור אירוע ←</button>
-
-      </form>
-    </div>
-
-
-    <!-- ══════════════════════════════════════════
-         STEP 3 — Organizer dashboard
-    ══════════════════════════════════════════ -->
-    <div data-step="org-dashboard" style="display:none;">
-
-      <div style="text-align:center;margin-bottom:2rem;">
-        <div style="width:64px;height:64px;border-radius:50%;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;box-shadow:0 0 24px rgba(34,197,94,.2);">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-        </div>
-        <h1 style="font-size:1.5rem;font-weight:800;color:#f1f5f9;">האירוע נוצר!</h1>
-        <p style="font-size:.83rem;color:#64748b;margin-top:.3rem;">הפסטיבל שלך פעיל ב-FastiRide.</p>
+        <h3>צ'אט חי עם הנהג</h3>
+        <p>מתאמים נקודת איסוף ומכירים את חברי הנסיעה עוד לפני שיוצאים.</p>
       </div>
+    </section>
 
-      <div style="display:flex;flex-direction:column;gap:.875rem;">
-
-        <div class="form-panel" style="padding:1.5rem;">
-          <p style="font-size:.78rem;font-weight:700;color:#94a3b8;margin-bottom:1rem;">סיכום אירוע</p>
-          <div style="display:flex;gap:1.25rem;align-items:flex-start;">
-            <div id="dash-logo-wrap" style="display:none;flex-shrink:0;">
-              <img id="dash-logo-img" src="" alt="לוגו" style="width:60px;height:60px;border-radius:.75rem;object-fit:cover;border:1px solid rgba(124,58,237,.3);" />
-            </div>
-            <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1.5rem;">
-              <div>
-                <p style="font-size:.72rem;color:#475569;margin-bottom:.2rem;">שם האירוע</p>
-                <p id="dash-event-name" style="font-size:.9rem;font-weight:700;color:#F5F5F5;">—</p>
-              </div>
-              <div>
-                <p style="font-size:.72rem;color:#475569;margin-bottom:.2rem;">תאריך</p>
-                <p id="dash-event-date" style="font-size:.9rem;font-weight:600;color:#FF3300;">—</p>
-              </div>
-              <div style="grid-column:1/-1;">
-                <p style="font-size:.72rem;color:#475569;margin-bottom:.2rem;">מיקום</p>
-                <p id="dash-event-location" style="font-size:.9rem;font-weight:600;color:#F97316;">—</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;">
-          <div class="form-panel" style="padding:1rem;text-align:center;">
-            <p style="font-size:1.6rem;font-weight:800;color:#FF3300;">0</p>
-            <p style="font-size:.72rem;color:#475569;margin-top:.2rem;">נסיעות</p>
-          </div>
-          <div class="form-panel" style="padding:1rem;text-align:center;">
-            <p style="font-size:1.6rem;font-weight:800;color:#34D399;">0</p>
-            <p style="font-size:.72rem;color:#475569;margin-top:.2rem;">משתתפים</p>
-          </div>
-          <div class="form-panel" style="padding:1rem;text-align:center;">
-            <div style="display:flex;align-items:center;justify-content:center;gap:.3rem;">
-              <span style="width:8px;height:8px;border-radius:50%;background:#4ade80;animation:dotPulse 2s infinite;"></span>
-              <p style="font-size:.85rem;font-weight:700;color:#4ade80;">פעיל</p>
-            </div>
-          </div>
-        </div>
-
-        <a id="dash-board-link" href="/board" class="btn-primary" style="display:block;text-align:center;text-decoration:none;">
-          פתח לוח נסיעות ←
-        </a>
-        <button onclick="handleOrganizerClick()" style="width:100%;text-align:center;background:none;border:none;cursor:pointer;font-family:inherit;font-size:.8rem;color:#64748b;padding:.5rem;">
-          חזרה לאירועים שלי
-        </button>
-      </div>
-    </div>
-
-
-    <!-- ══════════════════════════════════════════
-         STEP 3 (producer, returning) — My produced events
-    ══════════════════════════════════════════ -->
-    <div data-step="org-my-events" style="display:none;">
-
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;">
-        <div style="display:flex;align-items:center;gap:.875rem;">
-          <div id="org-me-avatar" style="width:46px;height:46px;border-radius:50%;background:#F97316;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.9rem;font-weight:800;flex-shrink:0;overflow:hidden;box-shadow:0 0 0 2px rgba(249,115,22,.4);"></div>
-          <div>
-            <p id="org-me-greeting" style="font-size:1.1rem;font-weight:800;color:#F5F5F5;">ברוך שובך!</p>
-            <p style="font-size:.75rem;color:#475569;margin-top:.1rem;">האירועים שאתה מפיק</p>
-          </div>
-        </div>
-        <button onclick="handleLogoutIndex()"
-          style="display:flex;align-items:center;gap:.4rem;font-size:.75rem;color:#475569;background:none;border:none;cursor:pointer;font-family:inherit;padding:.3rem .6rem;border-radius:.5rem;transition:color .2s;"
-          onmouseover="this.style.color='#fb7185'" onmouseout="this.style.color='#475569'">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          התנתק
-        </button>
-      </div>
-
-      <div id="org-events-list" style="display:flex;flex-direction:column;gap:.75rem;margin-bottom:1rem;"></div>
-
-      <button onclick="openOrganizerForm(null, null, 'org-my-events')"
-        style="width:100%;display:flex;align-items:center;gap:.875rem;background:rgba(255,51,0,.05);border:1.5px dashed rgba(255,51,0,.3);border-radius:.9rem;padding:.85rem 1rem;cursor:pointer;font-family:inherit;transition:border-color .2s,background .2s;"
-        onmouseover="this.style.borderColor='rgba(255,51,0,.6)';this.style.background='rgba(255,51,0,.08)'"
-        onmouseout="this.style.borderColor='rgba(255,51,0,.3)';this.style.background='rgba(255,51,0,.05)'">
-        <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </div>
-        <div style="text-align:right;">
-          <p style="font-size:.9rem;font-weight:700;color:#FF3300;">אירוע חדש</p>
-          <p style="font-size:.72rem;color:#666666;margin-top:.1rem;">פתח קבוצת טרמפים לאירוע נוסף</p>
-        </div>
-      </button>
-    </div>
-
-    <!-- Event attendees/rides stats modal (producer) -->
-    <div id="org-stats-modal" onclick="if(event.target===this)closeOrgStatsModal()" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:1rem;">
-      <div class="dm-card" style="position:relative;background:#141414;border:1px solid rgba(255,51,0,.3);border-radius:1.5rem;padding:1.75rem;width:100%;max-width:420px;max-height:80vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.5);">
-        <button onclick="closeOrgStatsModal()" style="position:absolute;top:1rem;left:1rem;background:rgba(255,255,255,.05);border:none;border-radius:50%;width:32px;height:32px;color:#666666;font-size:1.1rem;cursor:pointer;">&times;</button>
-        <h3 id="org-stats-title" style="font-size:1rem;font-weight:800;color:#F5F5F5;margin-bottom:1.25rem;">נתוני אירוע</h3>
-        <div id="org-stats-body"></div>
-      </div>
-    </div>
-
-    <!-- Confirm event creation modal — the "are you sure" friction step -->
-    <div id="confirm-create-modal" onclick="if(event.target===this)closeConfirmCreateModal()" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:1rem;">
-      <div class="dm-card" style="position:relative;background:#141414;border:1px solid rgba(255,51,0,.3);border-radius:1.5rem;padding:1.75rem;width:100%;max-width:400px;box-shadow:0 24px 60px rgba(0,0,0,.5);transform:translateY(30px);transition:transform .25s ease;">
-        <div style="width:44px;height:44px;border-radius:12px;background:rgba(255,51,0,.12);border:1px solid rgba(255,51,0,.3);display:flex;align-items:center;justify-content:center;margin-bottom:1rem;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        </div>
-        <h3 style="font-size:1.05rem;font-weight:800;color:#F5F5F5;margin-bottom:.4rem;">ליצור את האירוע?</h3>
-        <p style="font-size:.78rem;color:#64748b;margin-bottom:1.25rem;line-height:1.5;">האירוע ייפתח מיידית לציבור עם קבוצת טרמפים משלו. בדוק שהפרטים נכונים:</p>
-
-        <div style="background:var(--bg,#0A0A0A);border:1px solid #252525;border-radius:.9rem;padding:.9rem 1rem;display:flex;flex-direction:column;gap:.55rem;margin-bottom:1.5rem;">
-          <div style="display:flex;justify-content:space-between;font-size:.82rem;"><span style="color:#64748b;">אירוע</span><span id="confirm-ev-name" style="color:#F5F5F5;font-weight:700;"></span></div>
-          <div style="display:flex;justify-content:space-between;font-size:.82rem;"><span style="color:#64748b;">תאריך</span><span id="confirm-ev-date" style="color:#F5F5F5;font-weight:600;"></span></div>
-          <div style="display:flex;justify-content:space-between;font-size:.82rem;"><span style="color:#64748b;">מיקום</span><span id="confirm-ev-location" style="color:#F5F5F5;font-weight:600;"></span></div>
-          <div style="display:flex;justify-content:space-between;font-size:.82rem;"><span style="color:#64748b;">טלפון</span><span id="confirm-ev-phone" style="color:#F5F5F5;font-weight:600;direction:ltr;"></span></div>
-        </div>
-
-        <div style="display:flex;gap:.75rem;">
-          <button onclick="closeConfirmCreateModal()" style="flex:1;font-family:inherit;font-size:.85rem;font-weight:700;padding:.8rem;border-radius:.9rem;cursor:pointer;background:none;border:1px solid #252525;color:#94a3b8;">בטל</button>
-          <button onclick="doSubmitOrganizer()" class="btn-primary" style="flex:1.4;">אשר ופרסם ←</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══════════════════════════════════════════
-         STEP 3.5 — My Events (returning user)
-    ══════════════════════════════════════════ -->
-    <div data-step="my-events" style="display:none;">
-
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;">
-        <div style="display:flex;align-items:center;gap:.875rem;">
-          <div id="me-avatar" style="width:46px;height:46px;border-radius:50%;background:#F97316;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.9rem;font-weight:800;flex-shrink:0;overflow:hidden;box-shadow:0 0 0 2px rgba(249,115,22,.4);"></div>
-          <div>
-            <p id="me-greeting" style="font-size:1.1rem;font-weight:800;color:#F5F5F5;">ברוך שובך!</p>
-            <p style="font-size:.75rem;color:#475569;margin-top:.1rem;">בחר אירוע או הוסף חדש</p>
-          </div>
-        </div>
-        <button onclick="handleLogoutIndex()"
-          style="display:flex;align-items:center;gap:.4rem;font-size:.75rem;color:#475569;background:none;border:none;cursor:pointer;font-family:inherit;padding:.3rem .6rem;border-radius:.5rem;transition:color .2s;"
-          onmouseover="this.style.color='#fb7185'" onmouseout="this.style.color='#475569'">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          התנתק
-        </button>
-      </div>
-
-      <div style="margin-bottom:1rem;">
-        <p style="font-size:.78rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;">האירועים שלך</p>
-      </div>
-
-      <div id="my-events-list" style="display:flex;flex-direction:column;gap:.7rem;margin-bottom:1rem;"></div>
-
-      <!-- Add new event card -->
-      <button onclick="addNewEvent()"
-        style="width:100%;display:flex;align-items:center;gap:.875rem;background:rgba(255,51,0,.05);border:1.5px dashed rgba(255,51,0,.3);border-radius:.9rem;padding:.85rem 1rem;cursor:pointer;font-family:inherit;transition:border-color .2s,background .2s;"
-        onmouseover="this.style.borderColor='rgba(255,51,0,.6)';this.style.background='rgba(255,51,0,.08)'"
-        onmouseout="this.style.borderColor='rgba(255,51,0,.3)';this.style.background='rgba(255,51,0,.05)'">
-        <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </div>
-        <div style="text-align:right;">
-          <p style="font-size:.9rem;font-weight:700;color:#FF3300;">הוסף אירוע חדש</p>
-          <p style="font-size:.72rem;color:#666666;margin-top:.1rem;">העלה כרטיס לאירוע נוסף</p>
-        </div>
-      </button>
-
-    </div>
-
-
-    <!-- ══════════════════════════════════════════
-         STEP 4 — User login
-    ══════════════════════════════════════════ -->
-    <div data-step="user-login" style="display:none;">
-      <button onclick="show('landing')"
-        style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#475569;background:none;border:none;cursor:pointer;font-family:inherit;margin-bottom:2rem;padding:0;transition:color .2s;"
-        onmouseover="this.style.color='#FF6655'" onmouseout="this.style.color='#475569'">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        חזרה
-      </button>
-
-      <!-- Step tracker -->
-      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:2rem;">
-        <div class="step-active">1</div>
-        <span style="font-size:.8rem;font-weight:600;color:#e2e8f0;">חבר חשבון</span>
-        <div style="flex:1;height:1px;background:var(--border);"></div>
-        <span style="font-size:.8rem;color:#475569;">העלה כרטיס</span>
-        <div class="step-idle">2</div>
-      </div>
-
-      <div style="margin-bottom:2rem;">
-        <h1 style="font-size:1.5rem;font-weight:800;color:#f1f5f9;">חבר את החשבון שלך</h1>
-        <p style="font-size:.83rem;color:#64748b;margin-top:.3rem;">שלב 1 מתוך 2 — התחבר כדי שנוכל להציג את שמך ותמונתך על לוח הנסיעות.</p>
-      </div>
-
-      <div class="form-panel" style="padding:2rem;display:flex;flex-direction:column;gap:.875rem;">
-
-        <!-- Google -->
-        <a href="#" onclick="startOAuth(event)" class="btn-google">
-          <svg width="20" height="20" viewBox="0 0 24 24" style="flex-shrink:0;">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-          </svg>
-          המשך עם Google
-        </a>
-
-      </div>
-    </div>
-
-
-    <!-- ══════════════════════════════════════════
-         STEP 5 — Ticket upload
-    ══════════════════════════════════════════ -->
-    <div data-step="user-upload" style="display:none;">
-      <button onclick="show('user-login')"
-        style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#475569;background:none;border:none;cursor:pointer;font-family:inherit;margin-bottom:2rem;padding:0;transition:color .2s;"
-        onmouseover="this.style.color='#FF6655'" onmouseout="this.style.color='#475569'">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        חזרה
-      </button>
-
-      <!-- Step tracker -->
-      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:2rem;">
-        <div class="step-done">✓</div>
-        <span style="font-size:.8rem;color:#64748b;">חבר חשבון</span>
-        <div style="flex:1;height:1px;background:var(--border);"></div>
-        <span style="font-size:.8rem;font-weight:600;color:#e2e8f0;">העלה כרטיס</span>
-        <div class="step-active">2</div>
-      </div>
-
-      <div style="margin-bottom:1.5rem;">
-        <h1 style="font-size:1.5rem;font-weight:800;color:#f1f5f9;">העלה את הכרטיס שלך</h1>
-        <p style="font-size:.83rem;color:#64748b;margin-top:.3rem;">שלב 2 מתוך 2 — העלה screenshot של הכרטיס ובחר את האירוע.</p>
-      </div>
-
-      <!-- User pill -->
-      <div class="form-panel" style="padding:1rem 1.25rem;display:flex;align-items:center;gap:.875rem;margin-bottom:1.25rem;">
-        <div id="user-pill-avatar"
-          style="width:42px;height:42px;border-radius:50%;background:#F97316;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.85rem;font-weight:800;flex-shrink:0;overflow:hidden;box-shadow:0 0 0 2px rgba(249,115,22,.3);">G</div>
-        <div>
-          <p id="user-pill-name" style="font-size:.9rem;font-weight:600;color:#f1f5f9;">מחובר</p>
-          <p style="font-size:.72rem;color:#475569;display:flex;align-items:center;gap:.4rem;margin-top:.15rem;">
-            <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;animation:dotPulse 2s infinite;"></span>
-            מחובר דרך Google
-          </p>
-        </div>
-      </div>
-
-      <div style="display:flex;flex-direction:column;gap:.875rem;">
-
-        <!-- Upload -->
-        <div class="form-panel" style="padding:1.5rem;">
-          <div class="section-label">העלאת כרטיס</div>
-          <p style="font-size:.72rem;color:#475569;margin-bottom:.75rem;line-height:1.5;">
-            זו לא בדיקת הונאה מול חברת הכרטיסים — אנחנו רק בודקים שהתמונה שהעלית מזכירה את האירוע שבחרת, כדי לוודא שאתה בסביבה הנכונה.
-          </p>
-          <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed rgba(255,51,0,.25);border-radius:.875rem;padding:2.5rem 1rem;cursor:pointer;transition:border-color .2s,background .2s;"
-            onmouseover="this.style.borderColor='rgba(255,51,0,.5)';this.style.background='rgba(255,51,0,.04)'"
-            onmouseout="this.style.borderColor='rgba(255,51,0,.25)';this.style.background=''">
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:.875rem;opacity:.7;">
-              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-            </svg>
-            <p style="font-size:.875rem;font-weight:600;color:#94a3b8;">העלה screenshot של הכרטיס</p>
-            <p style="font-size:.75rem;color:#475569;margin-top:.25rem;">PNG / JPG / WEBP · עד 10 MB</p>
-            <input id="ticket-file" type="file" accept="image/*" style="display:none;" onchange="onFileSelect(this)" />
-          </label>
-          <div id="file-preview" style="display:none;margin-top:.75rem;display:none;align-items:center;gap:.75rem;background:rgba(0,0,0,.3);border:1px solid rgba(255,51,0,.2);border-radius:.75rem;padding:.7rem 1rem;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            <span id="file-name" style="font-size:.82rem;color:#94a3b8;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
-            <span style="font-size:.72rem;color:#4ade80;font-weight:600;flex-shrink:0;">מוכן</span>
-          </div>
-        </div>
-
-        <!-- Event select -->
-        <div class="form-panel" style="padding:1.5rem;">
-          <div class="section-label">בחר אירוע</div>
-          <div id="event-cards" style="display:flex;flex-direction:column;gap:.6rem;">
-            <div class="event-skeleton"></div>
-            <div class="event-skeleton"></div>
-          </div>
-          <p id="no-events-msg" style="display:none;font-size:.75rem;color:#475569;margin-top:.5rem;">אין אירועים פעילים. בקש מהמפיק ליצור אירוע תחילה.</p>
-        </div>
-
-        <button id="validate-btn" onclick="validateTicket()" class="btn-primary">
-          אשר השתתפות והיכנס ללוח הנסיעות ←
-        </button>
-
-        <div id="validate-error" style="display:none;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.3);border-radius:.75rem;padding:.75rem 1rem;display:flex;gap:.6rem;align-items:flex-start;">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <p id="validate-error-msg" style="font-size:.82rem;color:#fb7185;">יש להעלות כרטיס ולבחור אירוע לפני המשך.</p>
-        </div>
-      </div>
-    </div>
-
+    <footer>FastiRide © 2026</footer>
   </div>
-
-  <script>
-    function show(stepName) {
-      document.querySelectorAll('[data-step]').forEach(el => el.style.display = 'none');
-      const target = document.querySelector(`[data-step="${stepName}"]`);
-      if (target) target.style.display = '';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    function prefillUploadStep(me) {
-      const pill   = document.getElementById('user-pill-name');
-      const avatar = document.getElementById('user-pill-avatar');
-      if (pill) pill.textContent = me.name;
-      if (avatar && me.picture) {
-        avatar.innerHTML = `<img src="${me.picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" referrerpolicy="no-referrer" />`;
-        avatar.style.background = 'transparent';
-      }
-      sessionStorage.setItem('username', me.name);
-      sessionStorage.setItem('picture',  me.picture || '');
-      sessionStorage.setItem('email',    me.email   || '');
-    }
-
-    function renderMyEventsStep(me, events) {
-      const avatar   = document.getElementById('me-avatar');
-      const greeting = document.getElementById('me-greeting');
-      greeting.textContent = `ברוך שובך, ${me.name.split(' ')[0]}!`;
-      if (me.picture) {
-        avatar.innerHTML = `<img src="${me.picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" referrerpolicy="no-referrer" />`;
-        avatar.style.background = 'transparent';
-      } else {
-        avatar.textContent = me.name.charAt(0).toUpperCase();
-      }
-
-      const list = document.getElementById('my-events-list');
-      list.innerHTML = events.map((ue, i) => `
-        <button onclick="enterEvent(${ue.event_id})"
-          style="width:100%;display:flex;align-items:center;gap:.875rem;background:#141414;border:1.5px solid #252525;border-radius:.9rem;padding:.85rem 1rem;cursor:pointer;font-family:inherit;text-align:right;transition:border-color .2s;animation:fadeUp .4s ease-out ${i*0.07}s both;"
-          onmouseover="this.style.borderColor='#FF3300'"
-          onmouseout="this.style.borderColor='#252525'">
-          <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.28);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          </div>
-          <div style="flex:1;min-width:0;">
-            <p style="font-size:.9rem;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(ue.event.name)}</p>
-            ${ue.event.date ? `<p style="font-size:.72rem;color:#64748b;margin-top:.1rem;">${ue.event.date}</p>` : ''}
-          </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-        </button>`).join('');
-
-      prefillUploadStep(me);
-      show('my-events');
-    }
-
-    function escHtml(str) {
-      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
-    function enterEvent(eventId) {
-      sessionStorage.setItem('eventId', eventId);
-      window.location.href = '/board';
-    }
-
-    async function addNewEvent() {
-      await loadEvents();
-      show('user-upload');
-    }
-
-    async function handleLogoutIndex() {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      sessionStorage.clear();
-      show('landing');
-    }
-
-    async function handleAttendeeClick() {
-      try {
-        const meRes = await fetch('/api/me');
-        if (!meRes.ok) { show('user-login'); return; }
-        const me = await meRes.json();
-
-        const evRes = await fetch('/api/me/events');
-        const myEvents = evRes.ok ? await evRes.json() : [];
-
-        if (myEvents.length > 0) {
-          renderMyEventsStep(me, myEvents);
-        } else {
-          prefillUploadStep(me);
-          await loadEvents();
-          show('user-upload');
-        }
-      } catch {
-        show('user-login');
-      }
-    }
-
-    function startOAuth(e) {
-      e.preventDefault();
-      sessionStorage.setItem('awaitingOAuth', '1');
-      window.location.href = '/api/auth/google';
-    }
-
-    (async function handleOAuthReturn() {
-      if (!sessionStorage.getItem('awaitingOAuth')) return;
-      sessionStorage.removeItem('awaitingOAuth');
-      const intent = sessionStorage.getItem('intent');
-      sessionStorage.removeItem('intent');
-      if (intent === 'organizer') {
-        await handleOrganizerClick();
-      } else {
-        await handleAttendeeClick();
-      }
-    })();
-
-    /* ── Producer flow — gated behind Google login, same as attendees ── */
-    let _editingEventId = null;
-
-    async function handleOrganizerClick() {
-      try {
-        const meRes = await fetch('/api/me');
-        if (!meRes.ok) {
-          sessionStorage.setItem('intent', 'organizer');
-          show('user-login');
-          return;
-        }
-        const me = await meRes.json();
-        const evRes = await fetch('/api/me/produced-events');
-        const myEvents = evRes.ok ? await evRes.json() : [];
-        if (myEvents.length > 0) {
-          renderOrgEventsStep(me, myEvents);
-        } else {
-          openOrganizerForm(null, me);
-        }
-      } catch {
-        sessionStorage.setItem('intent', 'organizer');
-        show('user-login');
-      }
-    }
-
-    function renderOrgEventsStep(me, events) {
-      const avatar   = document.getElementById('org-me-avatar');
-      const greeting = document.getElementById('org-me-greeting');
-      greeting.textContent = `ברוך שובך, ${me.name.split(' ')[0]}!`;
-      if (me.picture) {
-        avatar.innerHTML = `<img src="${me.picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" referrerpolicy="no-referrer" />`;
-        avatar.style.background = 'transparent';
-      } else {
-        avatar.textContent = me.name.charAt(0).toUpperCase();
-      }
-
-      const list = document.getElementById('org-events-list');
-      list.innerHTML = events.map((ev, i) => `
-        <div class="form-panel" style="padding:1rem 1.1rem;animation:fadeUp .4s ease-out ${i*0.07}s both;">
-          <div style="display:flex;align-items:center;gap:.875rem;">
-            <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.28);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            </div>
-            <div style="flex:1;min-width:0;">
-              <p style="font-size:.9rem;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(ev.name)}</p>
-              ${ev.date ? `<p style="font-size:.72rem;color:#64748b;margin-top:.1rem;">${ev.date}</p>` : ''}
-            </div>
-          </div>
-          <div style="display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap;">
-            <a href="/board" onclick="sessionStorage.setItem('eventId',${ev.id})" style="flex:1;text-align:center;font-size:.75rem;font-weight:700;padding:.5rem;border-radius:.6rem;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.3);color:#FF3300;text-decoration:none;">לוח נסיעות</a>
-            <button onclick='openOrgStatsModal(${ev.id}, ${JSON.stringify(ev.name)})' style="flex:1;font-size:.75rem;font-weight:700;padding:.5rem;border-radius:.6rem;background:rgba(255,255,255,.05);border:1px solid var(--border, #252525);color:#94a3b8;cursor:pointer;font-family:inherit;">נתונים</button>
-            <button onclick="openOrganizerForm(${ev.id})" style="font-size:.75rem;font-weight:700;padding:.5rem .75rem;border-radius:.6rem;background:rgba(255,255,255,.05);border:1px solid var(--border, #252525);color:#94a3b8;cursor:pointer;font-family:inherit;">ערוך</button>
-            <button onclick="deleteProducedEvent(${ev.id})" style="font-size:.75rem;font-weight:700;padding:.5rem .75rem;border-radius:.6rem;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.3);color:#fb7185;cursor:pointer;font-family:inherit;">מחק</button>
-          </div>
-        </div>`).join('');
-
-      show('org-my-events');
-    }
-
-    let _orgFormOrigin = 'landing';
-
-    function goBackFromOrganizerForm() {
-      if (_orgFormOrigin === 'org-my-events') {
-        handleOrganizerClick();
-      } else {
-        show('landing');
-      }
-    }
-
-    async function openOrganizerForm(eventId, meArg, origin) {
-      _editingEventId  = eventId;
-      _orgFormOrigin   = origin || (eventId ? 'org-my-events' : 'landing');
-      const me = meArg || await fetch('/api/me').then(r => r.ok ? r.json() : null);
-      if (me) {
-        document.getElementById('org-pill-name').textContent = me.name;
-        if (me.picture) {
-          document.getElementById('org-pill-avatar').innerHTML =
-            `<img src="${me.picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" referrerpolicy="no-referrer" />`;
-          document.getElementById('org-pill-avatar').style.background = 'transparent';
-        }
-      }
-
-      const title = document.getElementById('organizer-title');
-      const btn   = document.getElementById('org-submit-btn');
-      document.getElementById('org-event-name').value = '';
-      document.getElementById('org-event-date').value = '';
-      document.getElementById('org-event-location').value = '';
-      document.getElementById('org-logo-name').textContent = 'העלה לוגו (PNG / JPG)';
-
-      // Phone is a one-time creation gate, not re-asked when editing
-      const phonePanel = document.getElementById('org-phone-panel');
-      const phoneInput = document.getElementById('org-phone');
-      phonePanel.style.display = eventId ? 'none' : 'block';
-      phoneInput.required = !eventId;
-      phoneInput.value = '';
-
-      if (eventId) {
-        title.textContent = 'ערוך אירוע';
-        btn.textContent   = 'שמור שינויים';
-        const events = await fetch('/api/me/produced-events').then(r => r.json());
-        const ev = events.find(e => e.id === eventId);
-        if (ev) {
-          document.getElementById('org-event-name').value     = ev.name || '';
-          document.getElementById('org-event-date').value     = ev.date || '';
-          document.getElementById('org-event-location').value = ev.location || '';
-        }
-      } else {
-        title.textContent = 'צור אירוע';
-        btn.textContent   = 'צור אירוע ←';
-      }
-
-      show('organizer');
-    }
-
-    async function deleteProducedEvent(eventId) {
-      if (!confirm('למחוק את האירוע? פעולה זו לא ניתנת לביטול.')) return;
-      try {
-        const res = await fetch(`/api/events/${eventId}`, { method: 'DELETE' });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail || 'מחיקת האירוע נכשלה.');
-        }
-        await handleOrganizerClick();
-      } catch (err) {
-        alert(err.message);
-      }
-    }
-
-    async function openOrgStatsModal(eventId, eventName) {
-      document.getElementById('org-stats-title').textContent = eventName;
-      const body = document.getElementById('org-stats-body');
-      body.innerHTML = `<p style="font-size:.82rem;color:#64748b;text-align:center;padding:1rem 0;">טוען...</p>`;
-      document.getElementById('org-stats-modal').style.display = 'flex';
-
-      try {
-        const data = await fetch(`/api/events/${eventId}/attendees`).then(r => r.json());
-        body.innerHTML = `
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.25rem;">
-            <div class="form-panel" style="padding:.9rem;text-align:center;">
-              <p style="font-size:1.4rem;font-weight:800;color:#4ade80;">${data.validated_count}</p>
-              <p style="font-size:.72rem;color:#475569;margin-top:.2rem;">כרטיסים אושרו</p>
-            </div>
-            <div class="form-panel" style="padding:.9rem;text-align:center;">
-              <p style="font-size:1.4rem;font-weight:800;color:#FF3300;">${data.rides_count}</p>
-              <p style="font-size:.72rem;color:#475569;margin-top:.2rem;">נסיעות פעילות</p>
-            </div>
-          </div>
-          ${data.rides.length ? data.rides.map(r => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 0;border-bottom:1px solid rgba(255,255,255,.06);">
-              <div>
-                <p style="font-size:.85rem;font-weight:600;color:#F5F5F5;">${escHtml(r.driver_name)}</p>
-                <p style="font-size:.72rem;color:#64748b;">${escHtml(r.city)} · ${escHtml(r.departure_time)}</p>
-              </div>
-              <span style="font-size:.72rem;color:#94a3b8;">${r.approved_count} נוסעים</span>
-            </div>
-          `).join('') : `<p style="font-size:.8rem;color:#475569;text-align:center;">עוד אין נסיעות לאירוע זה.</p>`}
-        `;
-      } catch {
-        body.innerHTML = `<p style="font-size:.82rem;color:#fb7185;text-align:center;">שגיאה בטעינת הנתונים.</p>`;
-      }
-    }
-
-    function closeOrgStatsModal() {
-      document.getElementById('org-stats-modal').style.display = 'none';
-    }
-
-    function validatePhoneFormat(phone) {
-      return /^0\d{8,9}$/.test((phone || '').replace(/\D/g, ''));
-    }
-
-    function submitOrganizer(e) {
-      e.preventDefault();
-      const isEdit = _editingEventId !== null;
-      if (isEdit) { doSubmitOrganizer(); return; }
-
-      // First-time creation gets a confirmation step — the point is to make
-      // sure this is deliberate, not to re-verify identity we already have.
-      const errEl = document.getElementById('org-error');
-      errEl.style.display = 'none';
-      const phone = document.getElementById('org-phone').value;
-      if (!validatePhoneFormat(phone)) {
-        errEl.textContent = 'מספר טלפון לא תקין.';
-        errEl.style.display = 'block';
-        return;
-      }
-
-      document.getElementById('confirm-ev-name').textContent = document.getElementById('org-event-name').value || '—';
-      document.getElementById('confirm-ev-date').textContent = document.getElementById('org-event-date').value || '—';
-      document.getElementById('confirm-ev-location').textContent = document.getElementById('org-event-location').value || '—';
-      document.getElementById('confirm-ev-phone').textContent = phone;
-      const modal = document.getElementById('confirm-create-modal');
-      modal.style.display = 'flex';
-      requestAnimationFrame(() => modal.querySelector('.dm-card').style.transform = 'translateY(0)');
-    }
-
-    function closeConfirmCreateModal() {
-      const modal = document.getElementById('confirm-create-modal');
-      modal.querySelector('.dm-card').style.transform = 'translateY(30px)';
-      setTimeout(() => modal.style.display = 'none', 200);
-    }
-
-    async function doSubmitOrganizer() {
-      closeConfirmCreateModal();
-      const btn   = document.getElementById('org-submit-btn');
-      const errEl = document.getElementById('org-error');
-      const isEdit = _editingEventId !== null;
-      btn.disabled = true;
-      btn.textContent = isEdit ? 'שומר...' : 'יוצר אירוע...';
-      errEl.style.display = 'none';
-
-      try {
-        const body = {
-          name:     document.getElementById('org-event-name').value,
-          location: document.getElementById('org-event-location').value,
-          date:     document.getElementById('org-event-date').value,
-        };
-        if (!isEdit) body.owner_phone = document.getElementById('org-phone').value;
-        const logoFile = document.getElementById('org-logo').files[0];
-        if (logoFile) {
-          body.logo_url = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.readAsDataURL(logoFile);
-          });
-        }
-
-        const res = isEdit
-          ? await fetch(`/api/events/${_editingEventId}`, {
-              method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-            })
-          : await fetch('/api/events', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-            });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail || 'שגיאה בשמירת האירוע — נסה שוב.');
-        }
-        const ev = await res.json();
-
-        if (isEdit) {
-          await handleOrganizerClick();
-        } else {
-          document.getElementById('dash-event-name').textContent = ev.name;
-          document.getElementById('dash-event-date').textContent = ev.date ? new Date(ev.date).toLocaleDateString('he-IL', {day:'numeric',month:'long',year:'numeric'}) : '—';
-          document.getElementById('dash-event-location').textContent = ev.location || '—';
-          document.getElementById('dash-board-link').onclick = () => sessionStorage.setItem('eventId', ev.id);
-          if (ev.logo_url) {
-            const img  = document.getElementById('dash-logo-img');
-            const wrap = document.getElementById('dash-logo-wrap');
-            img.src = ev.logo_url;
-            wrap.style.display = 'block';
-          }
-          show('org-dashboard');
-        }
-      } catch (err) {
-        errEl.textContent = err.message;
-        errEl.style.display = 'block';
-      } finally {
-        btn.disabled    = false;
-        btn.textContent = isEdit ? 'שמור שינויים' : 'צור אירוע ←';
-      }
-    }
-
-    let selectedEventId = null;
-
-    function selectEventCard(card, eventId) {
-      document.querySelectorAll('#event-cards .event-card').forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
-      selectedEventId = eventId;
-      document.getElementById('validate-error').style.display = 'none';
-    }
-
-    async function loadEvents() {
-      const container = document.getElementById('event-cards');
-      const noMsg     = document.getElementById('no-events-msg');
-      try {
-        const events = await fetch('/api/events').then(r => r.json());
-        if (!events.length) {
-          container.innerHTML = '';
-          noMsg.style.display = 'block';
-          return;
-        }
-        container.innerHTML = events.map((ev, i) => `
-          <div class="event-card" data-event-id="${ev.id}" style="animation-delay:${i * 0.08}s;">
-            <div class="event-bolt">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            </div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:.9rem;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ev.name}</div>
-              ${ev.date ? `<div style="font-size:.72rem;color:#64748b;margin-top:.15rem;">${ev.date}</div>` : ''}
-            </div>
-            <div class="check-badge">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            </div>
-          </div>`).join('');
-        container.querySelectorAll('.event-card').forEach(card => {
-          card.addEventListener('click', () => selectEventCard(card, card.dataset.eventId));
-        });
-      } catch {
-        container.innerHTML = '<p style="font-size:.78rem;color:#fb7185;">שגיאה בטעינת אירועים — רענן את הדף.</p>';
-      }
-    }
-
-    function onFileSelect(input) {
-      if (!input.files.length) return;
-      document.getElementById('file-name').textContent = input.files[0].name;
-      const preview = document.getElementById('file-preview');
-      preview.style.display = 'flex';
-    }
-
-    async function validateTicket() {
-      const fileInput = document.getElementById('ticket-file');
-      const eventId   = selectedEventId;
-      const errEl     = document.getElementById('validate-error');
-      const errMsg    = document.getElementById('validate-error-msg');
-      const btn       = document.getElementById('validate-btn');
-
-      if (!fileInput.files.length || !eventId) {
-        errMsg.textContent = 'יש להעלות screenshot של הכרטיס ולבחור אירוע לפני המשך.';
-        errEl.style.display = 'flex';
-        return;
-      }
-      errEl.style.display = 'none';
-      btn.disabled    = true;
-      btn.textContent = 'בודק את הכרטיס...';
-
-      try {
-        const form = new FormData();
-        form.append('event_id', eventId);
-        form.append('file', fileInput.files[0]);
-        const res  = await fetch('/api/validate', { method: 'POST', body: form });
-        const data = await res.json();
-        if (data.valid) {
-          sessionStorage.setItem('eventId', data.event_id);
-          window.location.href = '/board';
-        } else {
-          errMsg.textContent = data.error || 'לא הצלחנו לזהות את האירוע בתמונה שהעלית.';
-          errEl.style.display = 'flex';
-          btn.disabled    = false;
-          btn.textContent = 'אשר השתתפות והיכנס ללוח הנסיעות ←';
-        }
-      } catch {
-        errMsg.textContent = 'שגיאת תקשורת — נסה שנית.';
-        errEl.style.display = 'flex';
-        btn.disabled    = false;
-        btn.textContent = 'אשר השתתפות והיכנס ללוח הנסיעות ←';
-      }
-    }
-  </script>
-
-  <!-- ══════════ SYNTHWAVE PERSPECTIVE GRID ══════════ -->
-  <script>
-    (function () {
-      const canvas = document.getElementById('grid-canvas');
-      const ctx    = canvas.getContext('2d');
-
-      let W, H, offset = 0;
-      const FIRE   = '#FF3300';
-      const H_LINES = 16;
-      const V_LINES = 20;
-      const SPEED   = 0.55;
-
-      function resize() {
-        W = canvas.width  = window.innerWidth;
-        H = canvas.height = window.innerHeight;
-      }
-      resize();
-      window.addEventListener('resize', resize);
-
-      function drawGrid() {
-        ctx.clearRect(0, 0, W, H);
-
-        const vp      = { x: W / 2, y: H * 0.38 };
-        const bottom  = H + 40;
-        const spacing = (bottom - vp.y) / H_LINES;
-        const animated = offset % spacing;
-
-        ctx.shadowColor = FIRE;
-        ctx.shadowBlur  = 10;
-
-        /* Horizontal lines — animate toward viewer */
-        for (let i = 0; i <= H_LINES + 1; i++) {
-          const y = vp.y + i * spacing - animated;
-          if (y < vp.y) continue;
-          const t     = (y - vp.y) / (bottom - vp.y);
-          const alpha = t * 0.52;
-          const xL    = vp.x + (0 - vp.x) * (1 - t);
-          const xR    = vp.x + (W - vp.x) * (1 - t);
-          ctx.beginPath();
-          ctx.moveTo(xL, y);
-          ctx.lineTo(xR, y);
-          ctx.strokeStyle = `rgba(255,51,0,${alpha})`;
-          ctx.lineWidth   = t * 1.5;
-          ctx.stroke();
-        }
-
-        /* Vertical lines — fan from vanishing point */
-        for (let i = 0; i <= V_LINES; i++) {
-          const t      = i / V_LINES;
-          const xB     = W * t;
-          const alpha  = 0.05 + Math.abs(t - 0.5) * 0.28;
-          ctx.beginPath();
-          ctx.moveTo(vp.x, vp.y);
-          ctx.lineTo(xB, bottom);
-          ctx.strokeStyle = `rgba(255,51,0,${alpha})`;
-          ctx.lineWidth   = 0.8;
-          ctx.stroke();
-        }
-
-        ctx.shadowBlur = 0;
-        offset += SPEED;
-      }
-
-      function animate() {
-        drawGrid();
-        requestAnimationFrame(animate);
-      }
-      requestAnimationFrame(animate);
-
-      /* 3D tilt on role cards */
-      document.querySelectorAll('.role-card').forEach(card => {
-        card.addEventListener('mousemove', e => {
-          const rect = card.getBoundingClientRect();
-          const cx   = (e.clientX - rect.left) / rect.width  - 0.5;
-          const cy   = (e.clientY - rect.top)  / rect.height - 0.5;
-          card.style.transform = `translateY(-6px) perspective(900px) rotateX(${-cy*10}deg) rotateY(${cx*10}deg)`;
-        });
-        card.addEventListener('mouseleave', () => {
-          card.style.transform = '';
-          card.style.transition = 'transform .35s ease';
-        });
-        card.addEventListener('mouseenter', () => {
-          card.style.transition = 'transform .1s ease';
-        });
-      });
-    })();
-  </script>
 
 </body>
 </html>
