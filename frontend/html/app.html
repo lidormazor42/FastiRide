@@ -16,6 +16,9 @@
       --border:    #252525;
       --fire:      #FF3300;
       --fire-d:    #E52B00;
+      --gold:      #FFB238;
+      --amber:     #FF6A00;
+      --yellow:    #FFE066;
       --green:     #22C55E;
       --rose:      #EF4444;
       --text:      #F5F5F5;
@@ -35,6 +38,21 @@
     #grid-canvas {
       position: fixed; top:0; left:0; width:100%; height:100%;
       z-index: 0; pointer-events: none;
+    }
+
+    /* ── Aurora wash — same language as the landing page, toned down ── */
+    .aurora-bg {
+      position: fixed; inset: -20%; z-index: 0; pointer-events: none;
+      filter: blur(70px); opacity: .22;
+      background: conic-gradient(from 0deg at 50% 30%,
+        var(--fire) 0deg, var(--rose) 70deg, transparent 140deg,
+        var(--gold) 220deg, var(--amber) 280deg, var(--fire) 360deg);
+      animation: aurora-spin 30s linear infinite;
+      will-change: transform;
+    }
+    @keyframes aurora-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .aurora-bg { animation: none; }
     }
 
     /* ── 3D card tilt ───────────────────────────── */
@@ -61,6 +79,27 @@
 
     /* ── Logo ───────────────────────────────────── */
     .logo-text { color: #F5F5F5; font-family: 'Rubik', sans-serif; }
+    .logo-text.gradient {
+      background: linear-gradient(90deg, var(--yellow), var(--amber), var(--fire), var(--gold), var(--yellow));
+      background-size: 300% auto;
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      animation: gradient-sweep 7s linear infinite;
+    }
+    @keyframes gradient-sweep { to { background-position: 300% center; } }
+    @media (prefers-reduced-motion: reduce) {
+      .logo-text.gradient { animation: none; background-position: 0 center; }
+    }
+    .hero-logo-ring {
+      box-shadow: 0 0 0 1px rgba(255,178,56,.15), 0 0 40px rgba(255,51,0,.35);
+      animation: pulse-ring 3.4s ease-in-out infinite;
+    }
+    @keyframes pulse-ring {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(255,178,56,.15), 0 0 40px rgba(255,51,0,.35); }
+      50%      { box-shadow: 0 0 0 1px rgba(255,178,56,.3),  0 0 70px rgba(255,51,0,.6); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hero-logo-ring { animation: none; }
+    }
 
     /* ── Live badge ─────────────────────────────── */
     .glass-surface {
@@ -170,10 +209,19 @@
       background: #FF3300;
       color: #fff;
       transition: background .18s, transform .15s;
+      box-shadow: 0 0 0 0 rgba(255,51,0,.55);
+      animation: btn-pulse 2.6s ease-in-out infinite;
     }
     .btn-primary:hover:not(:disabled) { background: #E52B00; transform: translateY(-1px); }
     .btn-primary:active:not(:disabled) { transform: scale(.98); }
-    .btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+    .btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; animation: none; box-shadow: none; }
+    @keyframes btn-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255,51,0,.5); }
+      50%      { box-shadow: 0 0 0 10px rgba(255,51,0,0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .btn-primary { animation: none; }
+    }
 
     /* ── Google button ──────────────────────────── */
     .btn-google {
@@ -217,6 +265,9 @@
 </head>
 <body style="display:flex;align-items:flex-start;justify-content:center;padding:3.5rem 1rem 5rem;position:relative;overflow-x:hidden;">
 
+  <!-- Aurora colour wash (same language as the landing page) -->
+  <div class="aurora-bg" aria-hidden="true"></div>
+
   <!-- Synthwave perspective grid -->
   <canvas id="grid-canvas"></canvas>
 
@@ -230,7 +281,7 @@
       <!-- Hero -->
       <div style="text-align:center;margin-bottom:3rem;" class="fade-up">
         <div style="display:inline-flex;align-items:center;gap:.875rem;margin-bottom:1.25rem;">
-          <div style="width:56px;height:56px;border-radius:16px;background:rgba(255,51,0,.12);border:1.5px solid rgba(255,51,0,.35);display:flex;align-items:center;justify-content:center;">
+          <div class="hero-logo-ring" style="width:56px;height:56px;border-radius:16px;background:rgba(255,51,0,.12);border:1.5px solid rgba(255,51,0,.35);display:flex;align-items:center;justify-content:center;">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
               <polygon points="12,11 4.2,0.9 6.6,0.2" fill="#ffe066" opacity=".8"/>
               <polygon points="12,11 10.9,0 13.1,0" fill="#ff6a00" opacity=".9"/>
@@ -242,7 +293,7 @@
               <circle cx="12" cy="12" r="2.3" fill="#ff3300"/>
             </svg>
           </div>
-          <span class="logo-text" style="font-size:3.2rem;font-weight:900;letter-spacing:-.04em;">FastiRide</span>
+          <span class="logo-text gradient" style="font-size:3.2rem;font-weight:900;letter-spacing:-.04em;">FastiRide</span>
         </div>
         <p style="font-size:1rem;color:#94a3b8;font-weight:500;letter-spacing:-.01em;">פלטפורמת שיתוף נסיעות לאירועים ופסטיבלים</p>
         <p style="font-size:.82rem;color:#4a5568;margin-top:.5rem;font-weight:500;">מי אתה היום?</p>
