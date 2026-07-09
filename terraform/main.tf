@@ -20,6 +20,9 @@ terraform {
     key     = "fastiride/dev/terraform.tfstate"
     region  = "us-east-1"
     encrypt = true
+    # S3-native state locking (Terraform >= 1.10) — prevents two concurrent
+    # applies from corrupting the state, without needing a DynamoDB table.
+    use_lockfile = true
   }
 }
 

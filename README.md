@@ -1,5 +1,8 @@
 # FastiRide
 
+[![CI — Lint, Test, Deploy to Staging](https://github.com/lidormazor42/FastiRide/actions/workflows/ci.yaml/badge.svg)](https://github.com/lidormazor42/FastiRide/actions/workflows/ci.yaml)
+[![IaC Quality](https://github.com/lidormazor42/FastiRide/actions/workflows/iac-quality.yaml/badge.svg)](https://github.com/lidormazor42/FastiRide/actions/workflows/iac-quality.yaml)
+
 A ride-sharing platform for festival attendees — built as an end-to-end DevOps capstone project. The app itself (who's driving where) is secondary to the point of the exercise: a real application, fully containerized, deployed to a managed Kubernetes cluster on AWS, with GitOps continuous delivery and full observability, defined entirely as code.
 
 ## Stack

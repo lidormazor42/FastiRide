@@ -19,6 +19,12 @@ ALB_HOSTED_ZONE_ID="Z35SXDOTRQ7X7K"   # fixed AWS constant for ALBs in us-east-1
 echo "==> Reading RDS master password from SSM"
 RDS_PASSWORD=$(aws ssm get-parameter --name "$RDS_SSM_PARAM" --with-decryption --region "$AWS_REGION" --query "Parameter.Value" --output text)
 
+echo "==> Reading app session secret + Grafana admin password from SSM (terraform/app-secrets.tf)"
+SESSION_SECRET_PARAM=$(terraform output -raw app_session_secret_parameter)
+GRAFANA_PASSWORD_PARAM=$(terraform output -raw grafana_admin_password_parameter)
+SESSION_SECRET=$(aws ssm get-parameter --name "$SESSION_SECRET_PARAM" --with-decryption --region "$AWS_REGION" --query "Parameter.Value" --output text)
+GRAFANA_ADMIN_PASSWORD=$(aws ssm get-parameter --name "$GRAFANA_PASSWORD_PARAM" --with-decryption --region "$AWS_REGION" --query "Parameter.Value" --output text)
+
 echo "==> Connecting kubectl to $CLUSTER_NAME"
 aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
 
@@ -65,7 +71,7 @@ echo "==> Creating fastiride-secrets (prod → 'fastiride' db, staging → 'fast
 kubectl create secret generic fastiride-secrets \
   --namespace fastiride-prod \
   --from-literal=database-url="postgresql://fastiride:${RDS_PASSWORD}@${RDS_ENDPOINT}/fastiride" \
-  --from-literal=session-secret="dev-session-secret-change-in-prod" \
+  --from-literal=session-secret="$SESSION_SECRET" \
   --from-literal=google-client-id="$GOOGLE_CLIENT_ID" \
   --from-literal=google-client-secret="$GOOGLE_CLIENT_SECRET" \
   --dry-run=client -o yaml | kubectl apply -f -
@@ -73,7 +79,7 @@ kubectl create secret generic fastiride-secrets \
 kubectl create secret generic fastiride-secrets \
   --namespace fastiride-staging \
   --from-literal=database-url="postgresql://fastiride:${RDS_PASSWORD}@${RDS_ENDPOINT}/fastiride_staging" \
-  --from-literal=session-secret="dev-session-secret-change-in-prod" \
+  --from-literal=session-secret="$SESSION_SECRET" \
   --from-literal=google-client-id="$GOOGLE_CLIENT_ID" \
   --from-literal=google-client-secret="$GOOGLE_CLIENT_SECRET" \
   --dry-run=client -o yaml | kubectl apply -f -
@@ -83,7 +89,7 @@ kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f 
 kubectl create secret generic grafana-admin-credentials \
   --namespace monitoring \
   --from-literal=admin-user="admin" \
-  --from-literal=admin-password="1324" \
+  --from-literal=admin-password="$GRAFANA_ADMIN_PASSWORD" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "==> Creating alertmanager-ses-smtp (Alertmanager email notifications)"

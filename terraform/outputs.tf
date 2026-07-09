@@ -70,3 +70,13 @@ output "rds_ssm_password_parameter" {
   description = "SSM parameter name holding the RDS master password"
   value       = module.rds.ssm_password_parameter_name
 }
+
+output "app_session_secret_parameter" {
+  description = "SSM parameter name holding the app session-signing secret"
+  value       = aws_ssm_parameter.app_session_secret.name
+}
+
+output "grafana_admin_password_parameter" {
+  description = "SSM parameter name holding the Grafana admin password"
+  value       = aws_ssm_parameter.grafana_admin_password.name
+}

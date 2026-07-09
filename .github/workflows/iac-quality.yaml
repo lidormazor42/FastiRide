@@ -1,0 +1,76 @@
+name: IaC Quality — Terraform, Helm, Security Scan
+
+# The app pipeline (ci.yaml) lints Python; this one covers everything
+# infrastructure-as-code: Terraform formatting/validity, Helm chart sanity,
+# and a Trivy scan over the whole repo (dependency CVEs + IaC misconfigs).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - "helm/**"
+      - "k8s/**"
+      - ".github/workflows/**"
+  pull_request:
+    branches: [main]
+
+jobs:
+  terraform:
+    name: Terraform fmt + validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.5"
+
+      - name: terraform fmt (check only)
+        run: terraform -chdir=terraform fmt -check -recursive -diff
+
+      # -backend=false: validation doesn't need state access, so this runs
+      # without any AWS credentials.
+      - name: terraform validate
+        run: |
+          terraform -chdir=terraform init -backend=false -input=false
+          terraform -chdir=terraform validate
+
+  helm:
+    name: Helm lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint chart against every environment's values
+        run: |
+          helm lint helm/fastiride -f helm/fastiride/values.yaml -f helm/fastiride/values-staging.yaml
+          helm lint helm/fastiride -f helm/fastiride/values.yaml -f helm/fastiride/values-prod.yaml
+
+  security-scan:
+    name: Trivy security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Scans Python dependencies (requirements.txt) for known CVEs and
+      # Terraform/K8s manifests for misconfigurations. CRITICAL findings fail
+      # the pipeline; HIGH and below are reported in the job log for review.
+      - name: Trivy — fail on CRITICAL vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Trivy — report HIGH findings (informational)
+        if: always()
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH
+          exit-code: "0"
+          ignore-unfixed: true
