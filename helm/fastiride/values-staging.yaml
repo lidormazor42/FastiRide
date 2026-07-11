@@ -3,13 +3,13 @@
 # where changes get validated before an explicit version-tag promotes them to prod.
 backend:
   image:
-    tag: 9548dae961f738d607c729d8a31c8904116ac466 # seed value — bumped by CI (deploy-staging job) on every push to main from here on
+    tag: c003e9d9cd568aff0e186cbb5a655ab514a36653 # seed value — bumped by CI (deploy-staging job) on every push to main from here on
   replicas: 1
   irsa:
     roleArn: "arn:aws:iam::439594592108:role/fastiride-dev-backend-irsa" # same role, trust policy allows both namespaces
 frontend:
   image:
-    tag: 9548dae961f738d607c729d8a31c8904116ac466 # seed value — bumped by CI (deploy-staging job) on every push to main from here on
+    tag: c003e9d9cd568aff0e186cbb5a655ab514a36653 # seed value — bumped by CI (deploy-staging job) on every push to main from here on
   replicas: 1
 ingress:
   host: staging.fastiride.app
