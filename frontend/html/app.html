@@ -407,6 +407,18 @@
                 <input id="org-logo" type="file" accept="image/*" style="display:none;" onchange="const f=this.files[0];if(f)document.getElementById('org-logo-name').textContent=f.name;" />
               </label>
             </div>
+            <div style="grid-column:1/-1;">
+              <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">
+                כרטיסים לדוגמה (אופציונלי)
+                <span style="font-size:.68rem;color:#334155;font-weight:400;margin-right:.3rem;">— מעלה דוגמה של כרטיס אמיתי? המערכת תזהה אוטומטית ניסיונות כניסה עם כרטיסים מזויפים</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;background:rgba(255,51,0,.05);border:1.5px dashed rgba(255,51,0,.3);border-radius:.75rem;cursor:pointer;transition:border-color .2s,background .2s;" onmouseover="this.style.borderColor='rgba(255,51,0,.6)';this.style.background='rgba(255,51,0,.08)'" onmouseout="this.style.borderColor='rgba(255,51,0,.3)';this.style.background='rgba(255,51,0,.05)'">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
+                <span style="font-size:.8rem;color:#64748b;">הוסף תמונת כרטיס אמיתי (אפשר כמה, למשל לכל סבב מכירה)</span>
+                <input id="org-ref-tickets" type="file" accept="image/*" multiple style="display:none;" onchange="addReferenceTickets(this)" />
+              </label>
+              <div id="org-ref-tickets-preview" style="display:flex;flex-wrap:wrap;gap:.6rem;margin-top:.6rem;"></div>
+            </div>
           </div>
         </div>
 
@@ -840,6 +852,37 @@
     /* ── Producer flow — gated behind Google login, same as attendees ── */
     let _editingEventId = null;
 
+    /* ── Reference tickets (real-ticket samples used to auto-detect fakes) ── */
+    let _referenceTicketImages = [];
+
+    function renderReferenceTicketsPreview() {
+      const wrap = document.getElementById('org-ref-tickets-preview');
+      wrap.innerHTML = _referenceTicketImages.map((dataUrl, i) => `
+        <div style="position:relative;width:56px;height:56px;border-radius:.6rem;overflow:hidden;border:1px solid rgba(255,51,0,.3);">
+          <img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;" />
+          <button type="button" onclick="removeReferenceTicket(${i})" title="הסר"
+            style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:rgba(10,10,10,.75);border:none;color:#fff;font-size:.65rem;line-height:16px;cursor:pointer;padding:0;">✕</button>
+        </div>`).join('');
+    }
+
+    function addReferenceTickets(input) {
+      const files = Array.from(input.files || []);
+      Promise.all(files.map(f => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(f);
+      }))).then((dataUrls) => {
+        _referenceTicketImages.push(...dataUrls);
+        renderReferenceTicketsPreview();
+        input.value = '';
+      });
+    }
+
+    function removeReferenceTicket(index) {
+      _referenceTicketImages.splice(index, 1);
+      renderReferenceTicketsPreview();
+    }
+
     async function handleOrganizerClick() {
       try {
         const meRes = await fetch('/api/me');
@@ -925,6 +968,8 @@
       document.getElementById('org-event-date').value = '';
       document.getElementById('org-event-location').value = '';
       document.getElementById('org-logo-name').textContent = 'העלה לוגו (PNG / JPG)';
+      _referenceTicketImages = [];
+      renderReferenceTicketsPreview();
 
       // Phone is a one-time creation gate, not re-asked when editing
       const phonePanel = document.getElementById('org-phone-panel');
@@ -942,6 +987,8 @@
           document.getElementById('org-event-name').value     = ev.name || '';
           document.getElementById('org-event-date').value     = ev.date || '';
           document.getElementById('org-event-location').value = ev.location || '';
+          _referenceTicketImages = Array.isArray(ev.reference_tickets) ? [...ev.reference_tickets] : [];
+          renderReferenceTicketsPreview();
         }
       } else {
         title.textContent = 'צור אירוע';
@@ -1054,6 +1101,7 @@
           date:     document.getElementById('org-event-date').value,
         };
         if (!isEdit) body.owner_phone = document.getElementById('org-phone').value;
+        body.reference_tickets = _referenceTicketImages;
         const logoFile = document.getElementById('org-logo').files[0];
         if (logoFile) {
           body.logo_url = await new Promise((resolve) => {

@@ -1,5 +1,6 @@
-from pydantic import BaseModel
-from typing import Optional
+import json
+from pydantic import BaseModel, field_validator
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -12,6 +13,7 @@ class EventCreate(BaseModel):
     location: Optional[str] = None
     date: Optional[str] = None
     logo_url: Optional[str] = None
+    reference_tickets: Optional[List[str]] = None
     owner_phone: str
 
 
@@ -20,6 +22,7 @@ class EventUpdate(BaseModel):
     location: Optional[str] = None
     date: Optional[str] = None
     logo_url: Optional[str] = None
+    reference_tickets: Optional[List[str]] = None
 
 
 class EventOut(BaseModel):
@@ -28,8 +31,17 @@ class EventOut(BaseModel):
     location: Optional[str] = None
     date: Optional[str] = None
     logo_url: Optional[str] = None
+    reference_tickets: Optional[List[str]] = None
     owner_email: Optional[str] = None
     owner_phone: Optional[str] = None
+
+    @field_validator("reference_tickets", mode="before")
+    @classmethod
+    def _parse_reference_tickets(cls, v):
+        """DB stores this as a JSON string (Text column); expose it as a list."""
+        if isinstance(v, str):
+            return json.loads(v) if v else None
+        return v
 
     class Config:
         from_attributes = True

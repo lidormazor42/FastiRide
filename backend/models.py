@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey, DateTime, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -41,6 +41,11 @@ class Event(Base):
     location = Column(String, nullable=True)
     date = Column(String, nullable=True)
     logo_url = Column(String, nullable=True)
+    # JSON array of base64 data URIs — real ticket samples the producer
+    # uploads so /api/validate can compare visual similarity, not just OCR
+    # text. A list (not one image) because ticket rounds/price tiers often
+    # print different text on an otherwise-identical design.
+    reference_tickets = Column(Text, nullable=True)
     owner_email = Column(String, nullable=True)
     owner_phone = Column(String, nullable=True)
 

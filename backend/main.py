@@ -1,3 +1,5 @@
+import base64
+import json
 import os
 import re
 import uuid
@@ -57,6 +59,7 @@ if engine.dialect.name == "postgresql":
         # dropped for good, back to plain free-text geocoding for the map view.
         _conn.execute(text("ALTER TABLE rides DROP COLUMN IF EXISTS pickup_lat"))
         _conn.execute(text("ALTER TABLE rides DROP COLUMN IF EXISTS pickup_lng"))
+        _conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS reference_tickets TEXT"))
         _conn.execute(text("""
             DO $$ BEGIN
                 ALTER TABLE events ADD CONSTRAINT events_name_date_key UNIQUE (name, date);
@@ -201,7 +204,58 @@ def logout(response: Response):
 # there's no way to check a barcode is genuine or unused. This only checks
 # that the uploaded photo *plausibly* mentions the event, as a light spam
 # filter before someone can see/post rides. Framed honestly in the UI too.
-def _ticket_matches(qr_text: str, ocr_text: str, event: models.Event) -> bool:
+def _perceptual_hash(image: Image.Image, hash_size: int = 8) -> int:
+    """Coarse visual fingerprint (average hash) — compares overall layout/color,
+    not text. A small localized text edit (e.g. a ticket-round label) only
+    flips a couple of the hash_size**2 bits, so real tickets from different
+    rounds of the same design still match; a genuinely different event's
+    ticket (different template/colors/logo) does not, no matter what text is
+    pasted onto it."""
+    small = image.convert("L").resize((hash_size, hash_size), Image.LANCZOS)
+    pixels = list(small.getdata())
+    avg = sum(pixels) / len(pixels)
+    bits = 0
+    for i, p in enumerate(pixels):
+        if p > avg:
+            bits |= (1 << i)
+    return bits
+
+
+def _hamming_distance(a: int, b: int) -> int:
+    return bin(a ^ b).count("1")
+
+
+VISUAL_MATCH_THRESHOLD = 12  # out of 64 bits — tolerant of minor edits, not of a different design
+
+
+def _ticket_matches(qr_text: str, ocr_text: str, event: models.Event, image: Image.Image) -> bool:
+    # A scannable QR/barcode is mandatory — closes the "type the event name
+    # over any random image, no real ticket at all" gap that pure-OCR
+    # matching used to allow.
+    if not qr_text.strip():
+        return False
+
+    reference_tickets = json.loads(event.reference_tickets) if event.reference_tickets else []
+    if reference_tickets:
+        # Real reference samples exist for this event — visual similarity is
+        # the ONLY signal that decides. Text is deliberately excluded here:
+        # it's exactly the part an attacker can edit, so once we have real
+        # data to compare against, a text match alone must never be enough
+        # (a genuine ticket from a DIFFERENT event with this event's name
+        # pasted on top would otherwise still pass on text).
+        uploaded_hash = _perceptual_hash(image)
+        for ref_data_uri in reference_tickets:
+            try:
+                ref_bytes = base64.b64decode(ref_data_uri.split(",", 1)[1])
+                ref_image = Image.open(BytesIO(ref_bytes)).convert("RGB")
+                if _hamming_distance(uploaded_hash, _perceptual_hash(ref_image)) <= VISUAL_MATCH_THRESHOLD:
+                    return True
+            except Exception:
+                continue
+        return False
+
+    # No reference tickets at all for this event (producer chose not to
+    # upload any) — fall back to the original text-based baseline.
     combined = (qr_text + " " + ocr_text).lower()
     words = [w for w in event.name.split() if len(w) > 2]
     if not words:
@@ -277,7 +331,7 @@ async def validate(
     # ארכיון: שמירת תמונת הכרטיס ב-S3 (אם מוגדר bucket)
     _archive_ticket_to_s3(content, event.id)
 
-    if _ticket_matches(qr_text, ocr_text, event):
+    if _ticket_matches(qr_text, ocr_text, event, image):
         user = _get_user_from_cookie(session, db)
         if user:
             try:
@@ -287,7 +341,11 @@ async def validate(
                 db.rollback()
         return {"valid": True, "event_name": event.name, "event_id": event.id}
 
-    return {"valid": False, "error": f"לא זיהינו אזכור של '{event.name}' בתמונה שהעלית"}
+    if not qr_text.strip():
+        error = "לא זיהינו ברקוד/QR קריא בתמונה — יש להעלות צילום ברור של הכרטיס עצמו"
+    else:
+        error = f"התמונה שהעלית לא זוהתה ככרטיס תקף ל-'{event.name}'"
+    return {"valid": False, "error": error}
 
 
 # ── Events ────────────────────────────────────────────────────────
@@ -308,7 +366,12 @@ def create_event(
     phone = re.sub(r"\D", "", event.owner_phone or "")
     if not re.match(r"^0\d{8,9}$", phone):
         raise HTTPException(status_code=400, detail="מספר טלפון לא תקין")
-    db_event = models.Event(**event.model_dump(exclude={"owner_phone"}), owner_email=user.email, owner_phone=phone)
+    db_event = models.Event(
+        **event.model_dump(exclude={"owner_phone", "reference_tickets"}),
+        owner_email=user.email,
+        owner_phone=phone,
+        reference_tickets=json.dumps(event.reference_tickets) if event.reference_tickets else None,
+    )
     db.add(db_event)
     try:
         db.commit()
@@ -350,6 +413,8 @@ def update_event(
         raise HTTPException(status_code=404, detail="האירוע לא נמצא")
     _authorize_event_owner(event, session, db)
     for field, value in updates.model_dump(exclude_unset=True).items():
+        if field == "reference_tickets":
+            value = json.dumps(value) if value else None
         setattr(event, field, value)
     try:
         db.commit()
