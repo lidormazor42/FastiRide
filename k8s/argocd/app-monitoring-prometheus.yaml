@@ -26,3 +26,9 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      # kube-prometheus-stack's CRDs are large enough that client-side apply's
+      # last-applied-configuration annotation exceeds Kubernetes' 262144-byte
+      # annotation limit ("metadata.annotations: Too long"). Server-side apply
+      # tracks field ownership instead of a full-config annotation, so it has
+      # no size ceiling — this is the documented fix for this exact chart.
+      - ServerSideApply=true
