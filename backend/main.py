@@ -315,18 +315,22 @@ async def validate(
     except Exception:
         pass
 
-    # שלב ב' — OCR: Rekognition (מנוהל) עם fallback ל-pytesseract מקומי
+    # שלב ב' — OCR: Rekognition (מנוהל) עם fallback ל-pytesseract מקומי.
+    # מדלגים לגמרי כשלאירוע יש כרטיסי דוגמה — במקרה הזה ההחלטה נשענת רק על
+    # דמיון חזותי (ראו _ticket_matches), וה-OCR לא ייכנס לתמונה בכלל, אז אין
+    # טעם לשלם/להמתין לקריאת Rekognition שהתוצאה שלה תיזרק.
     ocr_text = ""
-    if USE_REKOGNITION:
-        try:
-            ocr_text = _extract_text_rekognition(content)
-        except Exception as e:
-            print(f"[REKOGNITION ERROR] {e} — falling back to local OCR")
-    if not ocr_text:
-        try:
-            ocr_text = pytesseract.image_to_string(image, lang="heb+eng")
-        except Exception:
-            pass
+    if not event.reference_tickets:
+        if USE_REKOGNITION:
+            try:
+                ocr_text = _extract_text_rekognition(content)
+            except Exception as e:
+                print(f"[REKOGNITION ERROR] {e} — falling back to local OCR")
+        if not ocr_text:
+            try:
+                ocr_text = pytesseract.image_to_string(image, lang="heb+eng")
+            except Exception:
+                pass
 
     # ארכיון: שמירת תמונת הכרטיס ב-S3 (אם מוגדר bucket)
     _archive_ticket_to_s3(content, event.id)
