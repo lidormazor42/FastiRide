@@ -227,6 +227,10 @@ def _hamming_distance(a: int, b: int) -> int:
 
 VISUAL_MATCH_THRESHOLD = 12  # out of 64 bits — tolerant of minor edits, not of a different design
 
+# Generous enough for a full-resolution phone photo of a ticket, small enough
+# to keep a hostile upload from tying up memory/Rekognition for nothing.
+MAX_TICKET_UPLOAD_BYTES = 15 * 1024 * 1024
+
 
 def _ticket_matches(qr_text: str, ocr_text: str, event: models.Event, image: Image.Image) -> bool:
     # A scannable QR/barcode is mandatory — closes the "type the event name
@@ -299,12 +303,25 @@ async def validate(
     db:       Session    = Depends(get_db),
     session:  str        = Cookie(default=None),
 ):
+    # Auth first: every anonymous call here would otherwise burn a paid
+    # Rekognition request and an S3 write — and the real user flow always
+    # reaches this screen logged-in anyway.
+    user = _get_user_from_cookie(session, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="יש להתחבר כדי לאמת כרטיס")
+
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         return {"valid": False, "error": "האירוע לא נמצא"}
 
     content = await file.read()
-    image   = Image.open(BytesIO(content)).convert("RGB")
+    if len(content) > MAX_TICKET_UPLOAD_BYTES:
+        return {"valid": False, "error": "הקובץ גדול מדי — יש להעלות תמונה עד 15MB"}
+    try:
+        image = Image.open(BytesIO(content)).convert("RGB")
+    except Exception:
+        # Covers corrupt files, non-images and PIL's decompression-bomb guard
+        return {"valid": False, "error": "הקובץ שהועלה אינו תמונה תקינה"}
 
     # שלב א' — סריקת QR / ברקוד (מקומי, מהיר, תמיד רץ)
     qr_text = ""
@@ -336,13 +353,11 @@ async def validate(
     _archive_ticket_to_s3(content, event.id)
 
     if _ticket_matches(qr_text, ocr_text, event, image):
-        user = _get_user_from_cookie(session, db)
-        if user:
-            try:
-                db.add(models.UserEvent(user_id=user.id, event_id=event.id))
-                db.commit()
-            except IntegrityError:
-                db.rollback()
+        try:
+            db.add(models.UserEvent(user_id=user.id, event_id=event.id))
+            db.commit()
+        except IntegrityError:
+            db.rollback()
         return {"valid": True, "event_name": event.name, "event_id": event.id}
 
     if not qr_text.strip():
