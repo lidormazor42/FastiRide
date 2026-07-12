@@ -973,6 +973,9 @@
       const btn   = document.getElementById('org-submit-btn');
       document.getElementById('org-event-name').value = '';
       document.getElementById('org-event-date').value = '';
+      // Grey out past dates in the picker (server enforces this too).
+      // en-CA gives YYYY-MM-DD in the user's local timezone.
+      document.getElementById('org-event-date').min = new Date().toLocaleDateString('en-CA');
       document.getElementById('org-event-location').value = '';
       document.getElementById('org-logo-name').textContent = 'העלה לוגו (PNG / JPG)';
       _referenceTicketImages = [];
