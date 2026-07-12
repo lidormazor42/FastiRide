@@ -891,7 +891,7 @@
         sel.innerHTML = '<option value="">בחר אירוע</option>';
         events.forEach(ev => {
           const selected = ev.id == eventId ? 'selected' : '';
-          sel.innerHTML += `<option value="${ev.id}" ${selected}>${ev.name}</option>`;
+          sel.innerHTML += `<option value="${ev.id}" ${selected}>${escHtml(ev.name)}</option>`;
         });
         if (eventId) {
           const cur = events.find(e => e.id == eventId);
@@ -1109,7 +1109,7 @@
                 const pInit  = (p.name || '?').split(' ').map(x=>x[0]?.toUpperCase()||'').slice(0,2).join('');
                 const inner  = p.picture
                   ? `<img src="${escHtml(p.picture)}" style="width:100%;height:100%;object-fit:cover;" referrerpolicy="no-referrer" />`
-                  : `<span style="font-size:.68rem;font-weight:700;color:#fff;">${pInit}</span>`;
+                  : `<span style="font-size:.68rem;font-weight:700;color:#fff;">${escHtml(pInit)}</span>`;
                 return `<div onclick="showParticipantProfile(${ride.id},${idx})"
                   title="${escHtml(p.name)}"
                   style="width:30px;height:30px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:${p.picture ? 'transparent' : pGrad};box-shadow:0 0 0 2px var(--bg);cursor:pointer;${idx>0?'margin-right:-10px;':''}position:relative;z-index:${10-idx};transition:transform .15s;"
@@ -1492,8 +1492,8 @@
       const initials = (name || '?').split(' ').map(p=>p[0]?.toUpperCase()||'').slice(0,2).join('');
 
       document.getElementById('dm-photo').innerHTML = photo
-        ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" referrerpolicy="no-referrer" />`
-        : `<span style="font-size:2rem;font-weight:800;color:#fff;">${initials}</span>`;
+        ? `<img src="${escHtml(photo)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" referrerpolicy="no-referrer" />`
+        : `<span style="font-size:2rem;font-weight:800;color:#fff;">${escHtml(initials)}</span>`;
       document.getElementById('dm-photo').style.background = photo ? 'transparent' : grad;
 
       document.getElementById('dm-name').textContent = name || '—';
