@@ -779,8 +779,10 @@
           style="width:100%;display:flex;align-items:center;gap:.875rem;background:#141414;border:1.5px solid #252525;border-radius:.9rem;padding:.85rem 1rem;cursor:pointer;font-family:inherit;text-align:right;transition:border-color .2s;animation:fadeUp .4s ease-out ${i*0.07}s both;"
           onmouseover="this.style.borderColor='#FF3300'"
           onmouseout="this.style.borderColor='#252525'">
-          <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.28);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.28);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">
+            ${ue.event.logo_url
+              ? `<img src="${ue.event.logo_url}" style="width:100%;height:100%;object-fit:cover;" />`
+              : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`}
           </div>
           <div style="flex:1;min-width:0;">
             <p style="font-size:.9rem;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(ue.event.name)}</p>
@@ -923,8 +925,10 @@
       list.innerHTML = events.map((ev, i) => `
         <div class="form-panel" style="padding:1rem 1.1rem;animation:fadeUp .4s ease-out ${i*0.07}s both;">
           <div style="display:flex;align-items:center;gap:.875rem;">
-            <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.28);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.28);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">
+              ${ev.logo_url
+                ? `<img src="${ev.logo_url}" style="width:100%;height:100%;object-fit:cover;" />`
+                : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`}
             </div>
             <div style="flex:1;min-width:0;">
               <p style="font-size:.9rem;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(ev.name)}</p>
@@ -1173,8 +1177,10 @@
         }
         container.innerHTML = events.map((ev, i) => `
           <div class="event-card" data-event-id="${ev.id}" style="animation-delay:${i * 0.08}s;">
-            <div class="event-bolt">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <div class="event-bolt" style="overflow:hidden;">
+              ${ev.logo_url
+                ? `<img src="${ev.logo_url}" style="width:100%;height:100%;object-fit:cover;" />`
+                : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`}
             </div>
             <div style="flex:1;min-width:0;">
               <div style="font-size:.9rem;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ev.name}</div>
