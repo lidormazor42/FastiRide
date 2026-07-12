@@ -1,4 +1,10 @@
+from datetime import date, timedelta
+
 from tests.conftest import make_user, login, make_event, make_ride
+
+
+def _iso(d):
+    return d.strftime("%Y-%m-%d")
 
 
 def test_create_event_requires_login(client):
@@ -45,6 +51,54 @@ def test_only_owner_can_update_event(client, db):
     res = client.patch(f"/api/events/{event.id}", json={"name": "Renamed"})
     assert res.status_code == 200
     assert res.json()["name"] == "Renamed"
+
+
+def test_create_event_rejects_past_date(client, db):
+    user = make_user(db)
+    login(client, user)
+    res = client.post("/api/events", json={
+        "name": "Fest", "date": _iso(date.today() - timedelta(days=1)),
+        "owner_phone": "0501234567",
+    })
+    assert res.status_code == 400
+
+
+def test_create_event_allows_today_and_rejects_garbage_date(client, db):
+    user = make_user(db)
+    login(client, user)
+    res = client.post("/api/events", json={
+        "name": "Fest", "date": _iso(date.today()), "owner_phone": "0501234567",
+    })
+    assert res.status_code == 200
+    res = client.post("/api/events", json={
+        "name": "Fest2", "date": "13-07-2026", "owner_phone": "0501234567",
+    })
+    assert res.status_code == 400
+
+
+def test_update_rejects_changing_date_to_past_but_legacy_event_stays_editable(client, db):
+    owner = make_user(db, email="owner@example.com")
+    past = _iso(date.today() - timedelta(days=30))
+    event = make_event(db, owner_email=owner.email, date=past)
+    login(client, owner)
+
+    # The edit form re-sends the stored (past) date untouched — must still work
+    res = client.patch(f"/api/events/{event.id}", json={"name": "Renamed", "date": past})
+    assert res.status_code == 200
+
+    # Actively moving the date to a different past date is blocked
+    res = client.patch(
+        f"/api/events/{event.id}",
+        json={"date": _iso(date.today() - timedelta(days=2))},
+    )
+    assert res.status_code == 400
+
+    # Moving it to the future is fine
+    res = client.patch(
+        f"/api/events/{event.id}",
+        json={"date": _iso(date.today() + timedelta(days=2))},
+    )
+    assert res.status_code == 200
 
 
 def test_public_events_hide_owner_contact_and_reference_tickets(client, db):

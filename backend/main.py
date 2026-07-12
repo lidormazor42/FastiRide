@@ -4,6 +4,7 @@ import os
 import re
 import uuid
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from io import BytesIO
 from urllib.parse import urlencode
 from fastapi import (
@@ -386,6 +387,20 @@ async def validate(
 
 
 # ── Events ────────────────────────────────────────────────────────
+def _validate_event_date(date_str: str | None) -> None:
+    """Reject past dates (and garbage) — compared against Israel time, the
+    app's audience, so an event created after midnight for 'today' passes."""
+    if not date_str:
+        return
+    try:
+        event_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="פורמט תאריך לא תקין")
+    today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
+    if event_date < today:
+        raise HTTPException(status_code=400, detail="לא ניתן לקבוע אירוע בתאריך שכבר עבר")
+
+
 @app.get("/api/events", response_model=list[schemas.EventPublic])
 def get_events(db: Session = Depends(get_db)):
     return db.query(models.Event).all()
@@ -403,6 +418,7 @@ def create_event(
     phone = re.sub(r"\D", "", event.owner_phone or "")
     if not re.match(r"^0\d{8,9}$", phone):
         raise HTTPException(status_code=400, detail="מספר טלפון לא תקין")
+    _validate_event_date(event.date)
     db_event = models.Event(
         **event.model_dump(exclude={"owner_phone", "reference_tickets"}),
         owner_email=user.email,
@@ -455,6 +471,12 @@ def update_event(
     for field, value in updates.model_dump(exclude_unset=True).items():
         if field == "reference_tickets":
             value = json.dumps(value) if value else None
+        # Only a CHANGED date is validated — the edit form always re-sends the
+        # stored date, and a legacy event whose date already passed must stay
+        # editable (name/logo/tickets) as long as the date itself isn't moved
+        # to another past date.
+        if field == "date" and value != event.date:
+            _validate_event_date(value)
         setattr(event, field, value)
     try:
         db.commit()
