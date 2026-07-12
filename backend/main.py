@@ -101,6 +101,10 @@ async def health():
 # ── Google OAuth ──────────────────────────────────────────────────
 @app.get("/api/auth/google")
 async def google_login():
+    # Random per-login state, echoed back by Google and compared against a
+    # short-lived cookie in the callback — a mismatch means the callback
+    # wasn't initiated by this browser (login CSRF), so it's rejected.
+    state = uuid.uuid4().hex
     params = urlencode({
         "client_id":     GOOGLE_CLIENT_ID,
         "redirect_uri":  GOOGLE_REDIRECT_URI,
@@ -108,12 +112,25 @@ async def google_login():
         "scope":         "openid email profile",
         "access_type":   "offline",
         "prompt":        "select_account",
+        "state":         state,
     })
-    return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
+    redirect = RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
+    redirect.set_cookie(
+        "oauth_state", state,
+        httponly=True, samesite="lax", max_age=600, path="/",
+    )
+    return redirect
 
 
 @app.get("/api/auth/google/callback")
-async def google_callback(code: str, db: Session = Depends(get_db)):
+async def google_callback(
+    code: str,
+    state: str = "",
+    oauth_state: str = Cookie(default=None),
+    db: Session = Depends(get_db),
+):
+    if not state or not oauth_state or state != oauth_state:
+        raise HTTPException(status_code=400, detail="בקשת התחברות לא תקינה — נסה שוב")
     async with httpx.AsyncClient() as client:
         token_res = await client.post(
             "https://oauth2.googleapis.com/token",
@@ -153,6 +170,7 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
         "session", _make_token(user.id),
         httponly=True, samesite="lax", max_age=30 * 24 * 3600, path="/",
     )
+    redirect.delete_cookie("oauth_state", path="/")
     return redirect
 
 
