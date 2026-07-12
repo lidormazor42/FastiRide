@@ -8,7 +8,7 @@ from io import BytesIO
 from urllib.parse import urlencode
 from fastapi import (
     FastAPI, Depends, HTTPException, UploadFile, File, Form, Cookie, Response,
-    WebSocket, WebSocketDisconnect,
+    WebSocket, WebSocketDisconnect, BackgroundTasks,
 )
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -20,7 +20,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from PIL import Image
 from pyzbar.pyzbar import decode as qr_decode
 import pytesseract
-from database import engine, get_db, Base
+from database import engine, get_db, Base, SessionLocal
 import models
 import schemas
 from email_service import send_join_notification, send_cancel_notification
@@ -101,6 +101,10 @@ async def health():
 # ── Google OAuth ──────────────────────────────────────────────────
 @app.get("/api/auth/google")
 async def google_login():
+    # Random per-login state, echoed back by Google and compared against a
+    # short-lived cookie in the callback — a mismatch means the callback
+    # wasn't initiated by this browser (login CSRF), so it's rejected.
+    state = uuid.uuid4().hex
     params = urlencode({
         "client_id":     GOOGLE_CLIENT_ID,
         "redirect_uri":  GOOGLE_REDIRECT_URI,
@@ -108,12 +112,25 @@ async def google_login():
         "scope":         "openid email profile",
         "access_type":   "offline",
         "prompt":        "select_account",
+        "state":         state,
     })
-    return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
+    redirect = RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
+    redirect.set_cookie(
+        "oauth_state", state,
+        httponly=True, samesite="lax", max_age=600, path="/",
+    )
+    return redirect
 
 
 @app.get("/api/auth/google/callback")
-async def google_callback(code: str, db: Session = Depends(get_db)):
+async def google_callback(
+    code: str,
+    state: str = "",
+    oauth_state: str = Cookie(default=None),
+    db: Session = Depends(get_db),
+):
+    if not state or not oauth_state or state != oauth_state:
+        raise HTTPException(status_code=400, detail="בקשת התחברות לא תקינה — נסה שוב")
     async with httpx.AsyncClient() as client:
         token_res = await client.post(
             "https://oauth2.googleapis.com/token",
@@ -153,6 +170,7 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
         "session", _make_token(user.id),
         httponly=True, samesite="lax", max_age=30 * 24 * 3600, path="/",
     )
+    redirect.delete_cookie("oauth_state", path="/")
     return redirect
 
 
@@ -227,6 +245,10 @@ def _hamming_distance(a: int, b: int) -> int:
 
 VISUAL_MATCH_THRESHOLD = 12  # out of 64 bits — tolerant of minor edits, not of a different design
 
+# Generous enough for a full-resolution phone photo of a ticket, small enough
+# to keep a hostile upload from tying up memory/Rekognition for nothing.
+MAX_TICKET_UPLOAD_BYTES = 15 * 1024 * 1024
+
 
 def _ticket_matches(qr_text: str, ocr_text: str, event: models.Event, image: Image.Image) -> bool:
     # A scannable QR/barcode is mandatory — closes the "type the event name
@@ -299,12 +321,25 @@ async def validate(
     db:       Session    = Depends(get_db),
     session:  str        = Cookie(default=None),
 ):
+    # Auth first: every anonymous call here would otherwise burn a paid
+    # Rekognition request and an S3 write — and the real user flow always
+    # reaches this screen logged-in anyway.
+    user = _get_user_from_cookie(session, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="יש להתחבר כדי לאמת כרטיס")
+
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         return {"valid": False, "error": "האירוע לא נמצא"}
 
     content = await file.read()
-    image   = Image.open(BytesIO(content)).convert("RGB")
+    if len(content) > MAX_TICKET_UPLOAD_BYTES:
+        return {"valid": False, "error": "הקובץ גדול מדי — יש להעלות תמונה עד 15MB"}
+    try:
+        image = Image.open(BytesIO(content)).convert("RGB")
+    except Exception:
+        # Covers corrupt files, non-images and PIL's decompression-bomb guard
+        return {"valid": False, "error": "הקובץ שהועלה אינו תמונה תקינה"}
 
     # שלב א' — סריקת QR / ברקוד (מקומי, מהיר, תמיד רץ)
     qr_text = ""
@@ -336,13 +371,11 @@ async def validate(
     _archive_ticket_to_s3(content, event.id)
 
     if _ticket_matches(qr_text, ocr_text, event, image):
-        user = _get_user_from_cookie(session, db)
-        if user:
-            try:
-                db.add(models.UserEvent(user_id=user.id, event_id=event.id))
-                db.commit()
-            except IntegrityError:
-                db.rollback()
+        try:
+            db.add(models.UserEvent(user_id=user.id, event_id=event.id))
+            db.commit()
+        except IntegrityError:
+            db.rollback()
         return {"valid": True, "event_name": event.name, "event_id": event.id}
 
     if not qr_text.strip():
@@ -353,7 +386,7 @@ async def validate(
 
 
 # ── Events ────────────────────────────────────────────────────────
-@app.get("/api/events")
+@app.get("/api/events", response_model=list[schemas.EventPublic])
 def get_events(db: Session = Depends(get_db)):
     return db.query(models.Event).all()
 
@@ -401,7 +434,10 @@ def get_my_produced_events(session: str = Cookie(default=None), db: Session = De
 
 def _authorize_event_owner(event: models.Event, session: str, db: Session) -> None:
     user = _get_user_from_cookie(session, db)
-    if event.owner_email and (not user or event.owner_email != user.email):
+    # No recorded owner = nobody is authorized (deny-by-default) — the old
+    # `if event.owner_email and ...` form silently let anyone manage
+    # legacy owner-less events.
+    if not user or not event.owner_email or event.owner_email != user.email:
         raise HTTPException(status_code=403, detail="אין הרשאה לנהל אירוע זה")
 
 
@@ -544,15 +580,22 @@ def create_ride(
     db: Session = Depends(get_db),
     session: str = Cookie(default=None),
 ):
+    user = _get_user_from_cookie(session, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="יש להתחבר כדי לפרסם נסיעה")
     event = db.query(models.Event).filter(models.Event.id == ride.event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="האירוע לא נמצא")
     ride_data = ride.model_dump()
-    # Guarantee driver_email is always saved — fill from session if client didn't send it
-    if not ride_data.get("driver_email"):
-        user = _get_user_from_cookie(session, db)
-        if user:
-            ride_data["driver_email"] = user.email
+    # Identity comes from the session, never from client input — same rule
+    # join_ride already enforces for passengers. A client-supplied
+    # driver_email would let anyone publish rides in someone else's name.
+    ride_data["driver_email"] = user.email
+    ride_data["driver_name"]  = user.name
+    if not ride_data.get("driver_photo"):
+        ride_data["driver_photo"] = user.picture
+    if not ride_data.get("driver_age"):
+        ride_data["driver_age"] = user.age
     db_ride = models.Ride(**ride_data)
     db.add(db_ride)
     db.commit()
@@ -571,8 +614,8 @@ def update_ride(
     if not ride:
         raise HTTPException(status_code=404, detail="הנסיעה לא נמצאה")
     user = _get_user_from_cookie(session, db)
-    # If the ride has an owner email, enforce it matches the session user
-    if ride.driver_email and (not user or ride.driver_email != user.email):
+    # Owner-less rides are locked, not open — deny-by-default
+    if not user or not ride.driver_email or ride.driver_email != user.email:
         raise HTTPException(status_code=403, detail="אין הרשאה לערוך נסיעה זו")
     for field, value in updates.model_dump(exclude_unset=True).items():
         setattr(ride, field, value)
@@ -591,8 +634,8 @@ def delete_ride(
     if not ride:
         raise HTTPException(status_code=404, detail="הנסיעה לא נמצאה")
     user = _get_user_from_cookie(session, db)
-    # If the ride has an owner email, enforce it matches the session user
-    if ride.driver_email and (not user or ride.driver_email != user.email):
+    # Owner-less rides are locked, not open — deny-by-default
+    if not user or not ride.driver_email or ride.driver_email != user.email:
         raise HTTPException(status_code=403, detail="אין הרשאה למחוק נסיעה זו")
     db.delete(ride)
     db.commit()
@@ -603,6 +646,7 @@ def delete_ride(
 def join_ride(
     ride_id: int,
     req: schemas.RideRequestCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     session: str = Cookie(default=None),
 ):
@@ -632,7 +676,10 @@ def join_ride(
     db.add(db_req)
     db.commit()
     db.refresh(db_req)
-    send_join_notification(
+    # Sent after the response, not inline — an SES/SMTP timeout (up to ~60s)
+    # must not stall the user's join request. Runs only if the commit succeeded.
+    background_tasks.add_task(
+        send_join_notification,
         driver_email=ride.driver_email or "",
         driver_name=ride.driver_name,
         passenger_name=user.name,
@@ -646,6 +693,7 @@ def join_ride(
 def cancel_join(
     ride_id: int,
     request_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     session: str = Cookie(default=None),
 ):
@@ -664,14 +712,19 @@ def cancel_join(
     # An approved passenger leaving frees their seat back up
     if req.status == "approved":
         ride.seats_available += 1
-    send_cancel_notification(
-        driver_email=ride.driver_email or "",
-        driver_name=ride.driver_name,
-        passenger_name=req.passenger_name,
-        ride_city=ride.city,
-    )
+    # Captured before delete — the ORM object expires once it's gone
+    passenger_name = req.passenger_name
     db.delete(req)
     db.commit()
+    # After the commit and off the request path — previously this fired
+    # BEFORE the commit, so a failed delete still emailed the driver.
+    background_tasks.add_task(
+        send_cancel_notification,
+        driver_email=ride.driver_email or "",
+        driver_name=ride.driver_name,
+        passenger_name=passenger_name,
+        ride_city=ride.city,
+    )
     return {"ok": True}
 
 
@@ -709,7 +762,7 @@ def get_my_pending_requests(session: str = Cookie(default=None), db: Session = D
 
 def _authorize_driver(ride: models.Ride, session: str, db: Session) -> None:
     user = _get_user_from_cookie(session, db)
-    if ride.driver_email and (not user or ride.driver_email != user.email):
+    if not user or not ride.driver_email or ride.driver_email != user.email:
         raise HTTPException(status_code=403, detail="אין הרשאה לנהל בקשה זו")
 
 
@@ -913,13 +966,20 @@ def mark_chat_read(
 
 
 @app.websocket("/api/ws/rides/{ride_id}/chat")
-async def ride_chat(websocket: WebSocket, ride_id: int, db: Session = Depends(get_db)):
-    ride = db.query(models.Ride).filter(models.Ride.id == ride_id).first()
-    user = _get_user_from_cookie(websocket.cookies.get("session"), db)
-    if not ride or not _can_access_chat(ride, user, db):
-        # 4403: application-level "forbidden" close code (4000+ is the app range)
-        await websocket.close(code=4403)
-        return
+async def ride_chat(websocket: WebSocket, ride_id: int):
+    # No Depends(get_db) here on purpose: a dependency session stays open for
+    # the WHOLE WebSocket lifetime (hours, with keepalive) — a handful of open
+    # chat tabs would exhaust the connection pool and starve the regular API.
+    # Instead: one short-lived session for the auth check, then one per message.
+    with SessionLocal() as db:
+        ride = db.query(models.Ride).filter(models.Ride.id == ride_id).first()
+        user = _get_user_from_cookie(websocket.cookies.get("session"), db)
+        if not ride or not _can_access_chat(ride, user, db):
+            # 4403: application-level "forbidden" close code (4000+ is the app range)
+            await websocket.close(code=4403)
+            return
+        # Plain strings so nothing touches the closed session afterwards
+        user_name, user_email = user.name, user.email
 
     await chat_rooms.connect(ride_id, websocket)
     try:
@@ -932,21 +992,23 @@ async def ride_chat(websocket: WebSocket, ride_id: int, db: Session = Depends(ge
             msg_text = (data.get("text") or "").strip()[:500]
             if not msg_text:
                 continue
-            msg = models.ChatMessage(
-                ride_id=ride_id,
-                sender_name=user.name,
-                sender_email=user.email,
-                text=msg_text,
-            )
-            db.add(msg)
-            db.commit()
-            db.refresh(msg)
+            with SessionLocal() as db:
+                msg = models.ChatMessage(
+                    ride_id=ride_id,
+                    sender_name=user_name,
+                    sender_email=user_email,
+                    text=msg_text,
+                )
+                db.add(msg)
+                db.commit()
+                db.refresh(msg)
+                created_at = msg.created_at.isoformat()
             await chat_rooms.broadcast(ride_id, {
                 "type":         "message",
-                "sender_name":  user.name,
-                "sender_email": user.email,
+                "sender_name":  user_name,
+                "sender_email": user_email,
                 "text":         msg_text,
-                "created_at":   msg.created_at.isoformat(),
+                "created_at":   created_at,
             })
     except WebSocketDisconnect:
         chat_rooms.disconnect(ride_id, websocket)

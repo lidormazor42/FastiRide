@@ -47,6 +47,29 @@ def test_only_owner_can_update_event(client, db):
     assert res.json()["name"] == "Renamed"
 
 
+def test_public_events_hide_owner_contact_and_reference_tickets(client, db):
+    """GET /api/events is unauthenticated — it must never expose the
+    producer's phone/email or the reference-ticket images (the forgery
+    baseline). It's also the page-load hot path, so keeping the base64
+    blobs out is what keeps the board fast."""
+    make_event(db)
+    res = client.get("/api/events")
+    assert res.status_code == 200
+    ev = res.json()[0]
+    assert "owner_phone" not in ev
+    assert "owner_email" not in ev
+    assert "reference_tickets" not in ev
+    assert set(ev) == {"id", "name", "location", "date", "logo_url"}
+
+
+def test_ownerless_event_is_locked_not_open(client, db):
+    user = make_user(db)
+    event = make_event(db, owner_email=None)
+    login(client, user)
+    res = client.patch(f"/api/events/{event.id}", json={"name": "Hijacked"})
+    assert res.status_code == 403
+
+
 def test_cannot_delete_event_with_active_rides(client, db):
     owner = make_user(db, email="owner@example.com")
     event = make_event(db, owner_email=owner.email)

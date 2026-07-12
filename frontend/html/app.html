@@ -781,12 +781,12 @@
           onmouseout="this.style.borderColor='#252525'">
           <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.28);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">
             ${ue.event.logo_url
-              ? `<img src="${ue.event.logo_url}" style="width:100%;height:100%;object-fit:cover;" />`
+              ? `<img src="${escHtml(ue.event.logo_url)}" style="width:100%;height:100%;object-fit:cover;" />`
               : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`}
           </div>
           <div style="flex:1;min-width:0;">
             <p style="font-size:.9rem;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(ue.event.name)}</p>
-            ${ue.event.date ? `<p style="font-size:.72rem;color:#64748b;margin-top:.1rem;">${ue.event.date}</p>` : ''}
+            ${ue.event.date ? `<p style="font-size:.72rem;color:#64748b;margin-top:.1rem;">${escHtml(ue.event.date)}</p>` : ''}
           </div>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
         </button>`).join('');
@@ -927,12 +927,12 @@
           <div style="display:flex;align-items:center;gap:.875rem;">
             <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,51,0,.1);border:1px solid rgba(255,51,0,.28);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">
               ${ev.logo_url
-                ? `<img src="${ev.logo_url}" style="width:100%;height:100%;object-fit:cover;" />`
+                ? `<img src="${escHtml(ev.logo_url)}" style="width:100%;height:100%;object-fit:cover;" />`
                 : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`}
             </div>
             <div style="flex:1;min-width:0;">
               <p style="font-size:.9rem;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(ev.name)}</p>
-              ${ev.date ? `<p style="font-size:.72rem;color:#64748b;margin-top:.1rem;">${ev.date}</p>` : ''}
+              ${ev.date ? `<p style="font-size:.72rem;color:#64748b;margin-top:.1rem;">${escHtml(ev.date)}</p>` : ''}
             </div>
           </div>
           <div style="display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap;">
@@ -1179,12 +1179,12 @@
           <div class="event-card" data-event-id="${ev.id}" style="animation-delay:${i * 0.08}s;">
             <div class="event-bolt" style="overflow:hidden;">
               ${ev.logo_url
-                ? `<img src="${ev.logo_url}" style="width:100%;height:100%;object-fit:cover;" />`
+                ? `<img src="${escHtml(ev.logo_url)}" style="width:100%;height:100%;object-fit:cover;" />`
                 : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF3300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`}
             </div>
             <div style="flex:1;min-width:0;">
-              <div style="font-size:.9rem;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ev.name}</div>
-              ${ev.date ? `<div style="font-size:.72rem;color:#64748b;margin-top:.15rem;">${ev.date}</div>` : ''}
+              <div style="font-size:.9rem;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(ev.name)}</div>
+              ${ev.date ? `<div style="font-size:.72rem;color:#64748b;margin-top:.15rem;">${escHtml(ev.date)}</div>` : ''}
             </div>
             <div class="check-badge">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
