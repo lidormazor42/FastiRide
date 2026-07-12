@@ -12,7 +12,10 @@ if DATABASE_URL.startswith("sqlite"):
         DATABASE_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
 else:
-    engine = create_engine(DATABASE_URL)
+    # pool_pre_ping: transparently replaces pooled connections that RDS (or a
+    # network blip) silently dropped — without it, the first request after an
+    # idle period 500s on a stale connection.
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

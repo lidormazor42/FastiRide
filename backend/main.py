@@ -20,7 +20,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from PIL import Image
 from pyzbar.pyzbar import decode as qr_decode
 import pytesseract
-from database import engine, get_db, Base
+from database import engine, get_db, Base, SessionLocal
 import models
 import schemas
 from email_service import send_join_notification, send_cancel_notification
@@ -956,13 +956,20 @@ def mark_chat_read(
 
 
 @app.websocket("/api/ws/rides/{ride_id}/chat")
-async def ride_chat(websocket: WebSocket, ride_id: int, db: Session = Depends(get_db)):
-    ride = db.query(models.Ride).filter(models.Ride.id == ride_id).first()
-    user = _get_user_from_cookie(websocket.cookies.get("session"), db)
-    if not ride or not _can_access_chat(ride, user, db):
-        # 4403: application-level "forbidden" close code (4000+ is the app range)
-        await websocket.close(code=4403)
-        return
+async def ride_chat(websocket: WebSocket, ride_id: int):
+    # No Depends(get_db) here on purpose: a dependency session stays open for
+    # the WHOLE WebSocket lifetime (hours, with keepalive) — a handful of open
+    # chat tabs would exhaust the connection pool and starve the regular API.
+    # Instead: one short-lived session for the auth check, then one per message.
+    with SessionLocal() as db:
+        ride = db.query(models.Ride).filter(models.Ride.id == ride_id).first()
+        user = _get_user_from_cookie(websocket.cookies.get("session"), db)
+        if not ride or not _can_access_chat(ride, user, db):
+            # 4403: application-level "forbidden" close code (4000+ is the app range)
+            await websocket.close(code=4403)
+            return
+        # Plain strings so nothing touches the closed session afterwards
+        user_name, user_email = user.name, user.email
 
     await chat_rooms.connect(ride_id, websocket)
     try:
@@ -975,21 +982,23 @@ async def ride_chat(websocket: WebSocket, ride_id: int, db: Session = Depends(ge
             msg_text = (data.get("text") or "").strip()[:500]
             if not msg_text:
                 continue
-            msg = models.ChatMessage(
-                ride_id=ride_id,
-                sender_name=user.name,
-                sender_email=user.email,
-                text=msg_text,
-            )
-            db.add(msg)
-            db.commit()
-            db.refresh(msg)
+            with SessionLocal() as db:
+                msg = models.ChatMessage(
+                    ride_id=ride_id,
+                    sender_name=user_name,
+                    sender_email=user_email,
+                    text=msg_text,
+                )
+                db.add(msg)
+                db.commit()
+                db.refresh(msg)
+                created_at = msg.created_at.isoformat()
             await chat_rooms.broadcast(ride_id, {
                 "type":         "message",
-                "sender_name":  user.name,
-                "sender_email": user.email,
+                "sender_name":  user_name,
+                "sender_email": user_email,
                 "text":         msg_text,
-                "created_at":   msg.created_at.isoformat(),
+                "created_at":   created_at,
             })
     except WebSocketDisconnect:
         chat_rooms.disconnect(ride_id, websocket)
