@@ -25,6 +25,48 @@ def test_create_ride_with_new_fields(client, db):
     assert body["driver_email"] == user.email
 
 
+def test_create_ride_requires_login(client, db):
+    event = make_event(db)
+    res = client.post("/api/rides", json={
+        "event_id": event.id,
+        "driver_name": "נהג",
+        "city": "תל אביב",
+        "pickup_point": "תחנה",
+        "departure_time": "14:00",
+    })
+    assert res.status_code == 401
+
+
+def test_create_ride_ignores_spoofed_driver_identity(client, db):
+    """driver_email/driver_name always come from the session — a client
+    sending someone else's email must not be able to publish rides in
+    their name (they'd own the ride and get its join-request emails)."""
+    user = make_user(db, name="Real Name", email="real@example.com")
+    event = make_event(db)
+    login(client, user)
+    res = client.post("/api/rides", json={
+        "event_id": event.id,
+        "driver_name": "Fake Name",
+        "driver_email": "victim@example.com",
+        "city": "תל אביב",
+        "pickup_point": "תחנה",
+        "departure_time": "14:00",
+    })
+    assert res.status_code == 200
+    body = res.json()
+    assert body["driver_email"] == "real@example.com"
+    assert body["driver_name"] == "Real Name"
+
+
+def test_ownerless_ride_is_locked_not_open(client, db):
+    user = make_user(db)
+    event = make_event(db)
+    ride = make_ride(db, event.id, driver_email=None)
+    login(client, user)
+    assert client.patch(f"/api/rides/{ride.id}", json={"city": "חיפה"}).status_code == 403
+    assert client.delete(f"/api/rides/{ride.id}").status_code == 403
+
+
 def test_create_ride_requires_existing_event(client, db):
     user = make_user(db)
     login(client, user)

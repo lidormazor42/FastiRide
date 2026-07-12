@@ -353,7 +353,7 @@ async def validate(
 
 
 # ── Events ────────────────────────────────────────────────────────
-@app.get("/api/events")
+@app.get("/api/events", response_model=list[schemas.EventPublic])
 def get_events(db: Session = Depends(get_db)):
     return db.query(models.Event).all()
 
@@ -401,7 +401,10 @@ def get_my_produced_events(session: str = Cookie(default=None), db: Session = De
 
 def _authorize_event_owner(event: models.Event, session: str, db: Session) -> None:
     user = _get_user_from_cookie(session, db)
-    if event.owner_email and (not user or event.owner_email != user.email):
+    # No recorded owner = nobody is authorized (deny-by-default) — the old
+    # `if event.owner_email and ...` form silently let anyone manage
+    # legacy owner-less events.
+    if not user or not event.owner_email or event.owner_email != user.email:
         raise HTTPException(status_code=403, detail="אין הרשאה לנהל אירוע זה")
 
 
@@ -544,15 +547,22 @@ def create_ride(
     db: Session = Depends(get_db),
     session: str = Cookie(default=None),
 ):
+    user = _get_user_from_cookie(session, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="יש להתחבר כדי לפרסם נסיעה")
     event = db.query(models.Event).filter(models.Event.id == ride.event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="האירוע לא נמצא")
     ride_data = ride.model_dump()
-    # Guarantee driver_email is always saved — fill from session if client didn't send it
-    if not ride_data.get("driver_email"):
-        user = _get_user_from_cookie(session, db)
-        if user:
-            ride_data["driver_email"] = user.email
+    # Identity comes from the session, never from client input — same rule
+    # join_ride already enforces for passengers. A client-supplied
+    # driver_email would let anyone publish rides in someone else's name.
+    ride_data["driver_email"] = user.email
+    ride_data["driver_name"]  = user.name
+    if not ride_data.get("driver_photo"):
+        ride_data["driver_photo"] = user.picture
+    if not ride_data.get("driver_age"):
+        ride_data["driver_age"] = user.age
     db_ride = models.Ride(**ride_data)
     db.add(db_ride)
     db.commit()
@@ -571,8 +581,8 @@ def update_ride(
     if not ride:
         raise HTTPException(status_code=404, detail="הנסיעה לא נמצאה")
     user = _get_user_from_cookie(session, db)
-    # If the ride has an owner email, enforce it matches the session user
-    if ride.driver_email and (not user or ride.driver_email != user.email):
+    # Owner-less rides are locked, not open — deny-by-default
+    if not user or not ride.driver_email or ride.driver_email != user.email:
         raise HTTPException(status_code=403, detail="אין הרשאה לערוך נסיעה זו")
     for field, value in updates.model_dump(exclude_unset=True).items():
         setattr(ride, field, value)
@@ -591,8 +601,8 @@ def delete_ride(
     if not ride:
         raise HTTPException(status_code=404, detail="הנסיעה לא נמצאה")
     user = _get_user_from_cookie(session, db)
-    # If the ride has an owner email, enforce it matches the session user
-    if ride.driver_email and (not user or ride.driver_email != user.email):
+    # Owner-less rides are locked, not open — deny-by-default
+    if not user or not ride.driver_email or ride.driver_email != user.email:
         raise HTTPException(status_code=403, detail="אין הרשאה למחוק נסיעה זו")
     db.delete(ride)
     db.commit()
@@ -709,7 +719,7 @@ def get_my_pending_requests(session: str = Cookie(default=None), db: Session = D
 
 def _authorize_driver(ride: models.Ride, session: str, db: Session) -> None:
     user = _get_user_from_cookie(session, db)
-    if ride.driver_email and (not user or ride.driver_email != user.email):
+    if not user or not ride.driver_email or ride.driver_email != user.email:
         raise HTTPException(status_code=403, detail="אין הרשאה לנהל בקשה זו")
 
 

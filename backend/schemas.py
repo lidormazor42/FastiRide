@@ -47,6 +47,20 @@ class EventOut(BaseModel):
         from_attributes = True
 
 
+class EventPublic(BaseModel):
+    """Public event listing — deliberately excludes owner contact details
+    (privacy) and reference_tickets (both private security material and a
+    huge base64 payload that made /api/events megabytes-heavy)."""
+    id: int
+    name: str
+    location: Optional[str] = None
+    date: Optional[str] = None
+    logo_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class RideCreate(BaseModel):
     event_id: int
     driver_name: str
@@ -102,7 +116,7 @@ class ProfileUpdate(BaseModel):
 
 class UserEventOut(BaseModel):
     event_id: int
-    event: EventOut
+    event: EventPublic
     validated_at: datetime
 
     class Config:

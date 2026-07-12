@@ -859,11 +859,9 @@
       username = username || 'אורח';
       renderAvatar(picture);
       document.getElementById('r-driver').value = username;
-      // Load data AFTER username is set — prevents stale isOwn checks
-      await loadEvents();
-      await loadPendingRequests();
-      await loadMyChats();
-      await loadRides();
+      // Load data AFTER username is set — prevents stale isOwn checks.
+      // Independent calls, run in parallel instead of a sequential waterfall.
+      await Promise.all([loadEvents(), loadPendingRequests(), loadMyChats(), loadRides()]);
       if (myAge === null) openProfilePanel();
     })();
 
