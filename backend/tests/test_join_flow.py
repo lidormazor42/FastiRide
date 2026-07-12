@@ -93,3 +93,23 @@ def test_cancel_join_frees_seat_only_if_was_approved(client, db):
 
     rides = client.get(f"/api/rides?event_id={event.id}").json()
     assert next(r for r in rides if r["id"] == ride.id)["seats_available"] == 2
+
+
+def test_join_and_cancel_send_driver_notifications(client, db, _no_real_emails):
+    """Emails now go through BackgroundTasks — this pins that they still
+    actually fire (TestClient runs background tasks before returning)."""
+    driver = make_user(db, email="driver@example.com")
+    passenger = make_user(db, email="passenger@example.com")
+    event = make_event(db)
+    ride = make_ride(db, event.id, driver_email=driver.email)
+
+    login(client, passenger)
+    request_id = client.post(
+        f"/api/rides/{ride.id}/join", json={"passenger_name": passenger.name}
+    ).json()["id"]
+    assert len(_no_real_emails) == 1
+    assert _no_real_emails[0][0] == "driver@example.com"
+
+    client.delete(f"/api/rides/{ride.id}/join/{request_id}")
+    assert len(_no_real_emails) == 2
+    assert _no_real_emails[1][0] == "driver@example.com"

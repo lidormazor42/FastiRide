@@ -8,7 +8,7 @@ from io import BytesIO
 from urllib.parse import urlencode
 from fastapi import (
     FastAPI, Depends, HTTPException, UploadFile, File, Form, Cookie, Response,
-    WebSocket, WebSocketDisconnect,
+    WebSocket, WebSocketDisconnect, BackgroundTasks,
 )
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -646,6 +646,7 @@ def delete_ride(
 def join_ride(
     ride_id: int,
     req: schemas.RideRequestCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     session: str = Cookie(default=None),
 ):
@@ -675,7 +676,10 @@ def join_ride(
     db.add(db_req)
     db.commit()
     db.refresh(db_req)
-    send_join_notification(
+    # Sent after the response, not inline — an SES/SMTP timeout (up to ~60s)
+    # must not stall the user's join request. Runs only if the commit succeeded.
+    background_tasks.add_task(
+        send_join_notification,
         driver_email=ride.driver_email or "",
         driver_name=ride.driver_name,
         passenger_name=user.name,
@@ -689,6 +693,7 @@ def join_ride(
 def cancel_join(
     ride_id: int,
     request_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     session: str = Cookie(default=None),
 ):
@@ -707,14 +712,19 @@ def cancel_join(
     # An approved passenger leaving frees their seat back up
     if req.status == "approved":
         ride.seats_available += 1
-    send_cancel_notification(
-        driver_email=ride.driver_email or "",
-        driver_name=ride.driver_name,
-        passenger_name=req.passenger_name,
-        ride_city=ride.city,
-    )
+    # Captured before delete — the ORM object expires once it's gone
+    passenger_name = req.passenger_name
     db.delete(req)
     db.commit()
+    # After the commit and off the request path — previously this fired
+    # BEFORE the commit, so a failed delete still emailed the driver.
+    background_tasks.add_task(
+        send_cancel_notification,
+        driver_email=ride.driver_email or "",
+        driver_name=ride.driver_name,
+        passenger_name=passenger_name,
+        ride_city=ride.city,
+    )
     return {"ok": True}
 
 
