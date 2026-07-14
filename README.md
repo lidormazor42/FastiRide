@@ -189,14 +189,30 @@ Deletes the ArgoCD-managed apps first (so the ALB gets cleanly released), then d
 
 ## Screenshots
 
-_Add these to `docs/images/` and reference them here before submitting:_
+- [x] `docs/images/app-board.png` — the ride board in the browser
+- [x] `docs/images/argocd-apps.png` — ArgoCD showing all Applications Synced/Healthy
+- [x] `docs/images/grafana-red-dashboard.png` — the custom FastiRide Backend dashboard
+- [x] `docs/images/grafana-cluster-dashboard.png` — the Kubernetes Cluster Overview dashboard
+- [x] `docs/images/ci-pipeline.png` — a green GitHub Actions run (lint → test → build → push)
+- [x] `docs/images/rds-console.png` — the RDS instance, `available`
 
-- [ ] `docs/images/app-board.png` — the ride board in the browser
-- [ ] `docs/images/argocd-apps.png` — ArgoCD showing all Applications Synced/Healthy
-- [ ] `docs/images/grafana-red-dashboard.png` — the custom FastiRide Backend dashboard
-- [ ] `docs/images/grafana-cluster-dashboard.png` — the Kubernetes Cluster Overview dashboard
-- [ ] `docs/images/ci-pipeline.png` — a green GitHub Actions run (lint → test → build → push)
-- [ ] `docs/images/rds-console.png` — the RDS instance, `available`
+**The ride board:**
+![Ride board](docs/images/app-board.png)
+
+**ArgoCD — all 5 Applications Synced/Healthy:**
+![ArgoCD Applications](docs/images/argocd-apps.png)
+
+**Grafana — FastiRide Backend (RED method):**
+![Grafana backend dashboard](docs/images/grafana-red-dashboard.png)
+
+**Grafana — Kubernetes Cluster Overview:**
+![Grafana cluster dashboard](docs/images/grafana-cluster-dashboard.png)
+
+**CI/CD — a green pipeline run:**
+![CI pipeline](docs/images/ci-pipeline.png)
+
+**RDS — managed PostgreSQL, `available`:**
+![RDS console](docs/images/rds-console.png)
 
 ## Managing the Cluster with k9s
 
