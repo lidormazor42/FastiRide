@@ -32,6 +32,10 @@
       color: var(--text);
       font-family: 'Rubik', 'Heebo', -apple-system, BlinkMacSystemFont, sans-serif;
       min-height: 100vh;
+      /* Scales everything uniformly (text, icons, spacing) so the board reads
+         less "zoomed in" at a normal 100% browser zoom, without touching the
+         hundreds of individual sizes throughout this page. */
+      zoom: 0.88;
     }
 
     /* ── Neon grid texture ──────────────────────── */
