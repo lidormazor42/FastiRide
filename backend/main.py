@@ -432,6 +432,10 @@ def create_event(
         db.rollback()
         raise HTTPException(status_code=409, detail="אירוע עם אותו שם ותאריך כבר קיים")
     db.refresh(db_event)
+    # The producer created this event themselves — they shouldn't have to
+    # validate a ticket for it too, same as anyone else who scans in.
+    db.add(models.UserEvent(user_id=user.id, event_id=db_event.id))
+    db.commit()
     return db_event
 
 

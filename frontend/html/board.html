@@ -492,13 +492,6 @@
                 </div>
               </div>
 
-              <div>
-                <label style="display:block;font-size:.73rem;color:#64748b;margin-bottom:.4rem;font-weight:500;">אירוע</label>
-                <select id="r-event" required class="field">
-                  <option value="">טוען...</option>
-                </select>
-              </div>
-
               <div style="height:1px;background:var(--border);margin:.25rem 0;"></div>
               <p style="font-size:.68rem;font-weight:700;color:#FF6A00;text-transform:uppercase;letter-spacing:.06em;margin:0 0 -.25rem;">מסלול הנסיעה</p>
 
@@ -891,12 +884,6 @@
     async function loadEvents() {
       try {
         const events = await fetch('/api/events').then(r => r.json());
-        const sel = document.getElementById('r-event');
-        sel.innerHTML = '<option value="">בחר אירוע</option>';
-        events.forEach(ev => {
-          const selected = ev.id == eventId ? 'selected' : '';
-          sel.innerHTML += `<option value="${ev.id}" ${selected}>${escHtml(ev.name)}</option>`;
-        });
         if (eventId) {
           const cur = events.find(e => e.id == eventId);
           if (cur) {
@@ -1317,10 +1304,10 @@
       e.preventDefault();
       const btn   = document.getElementById('create-btn');
       const errEl = document.getElementById('create-error');
-      const evtId = document.getElementById('r-event').value;
+      const evtId = eventId;
 
       if (!evtId) {
-        errEl.textContent = 'יש לבחור אירוע.';
+        errEl.textContent = 'לא נבחר אירוע — חזור למסך "האירועים שלי" ובחר אירוע קודם.';
         errEl.style.display = 'block';
         return;
       }

@@ -29,6 +29,19 @@ def test_create_event_success(client, db):
     assert body["owner_phone"] == "0501234567"
 
 
+def test_create_event_grants_creator_immediate_access(client, db):
+    """A producer shouldn't have to validate a ticket for the event they
+    just created themselves — creating it should count as access already."""
+    user = make_user(db)
+    login(client, user)
+    res = client.post("/api/events", json={"name": "Fest", "date": "2026-08-01", "owner_phone": "0501234567"})
+    assert res.status_code == 200
+    event_id = res.json()["id"]
+
+    my_events = client.get("/api/me/events").json()
+    assert [e["event_id"] for e in my_events] == [event_id]
+
+
 def test_create_event_duplicate_name_date_conflicts(client, db):
     user = make_user(db)
     login(client, user)
