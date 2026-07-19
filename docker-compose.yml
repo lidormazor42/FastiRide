@@ -19,6 +19,17 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: fastiride-redis
+    networks:
+      - fastiride-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   backend:
     build: ./backend
     container_name: fastiride-backend
@@ -27,6 +38,7 @@ services:
     environment:
       - PORT=8000
       - DATABASE_URL=postgresql://fastiride:fastiride@db:5432/fastiride
+      - REDIS_URL=redis://redis:6379/0
       - AWS_REGION=us-east-1
       - USE_REKOGNITION=true
       # S3_UPLOADS_BUCKET is set once terraform creates the bucket:
@@ -37,6 +49,8 @@ services:
       - ~/.aws:/root/.aws:ro
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - fastiride-net

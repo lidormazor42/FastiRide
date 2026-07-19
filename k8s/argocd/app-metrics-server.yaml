@@ -1,0 +1,29 @@
+# metrics-server — the Metrics API provider HPA depends on. Not bundled with
+# EKS (it's an optional in-cluster component, like the LBC or ArgoCD itself).
+# Values are inline (not a $values file) — two flags don't justify a file.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metrics-server
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes-sigs.github.io/metrics-server/
+    chart: metrics-server
+    targetRevision: "3.12.2"
+    helm:
+      values: |
+        args:
+          # EKS kubelets serve self-signed certs — without this flag
+          # metrics-server can't scrape them and every metric shows <unknown>
+          - --kubelet-insecure-tls
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
