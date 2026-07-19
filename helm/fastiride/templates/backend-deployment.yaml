@@ -45,6 +45,8 @@ spec:
                   key: google-client-secret
             - name: GOOGLE_REDIRECT_URI
               value: {{ .Values.config.googleRedirectUri | quote }}
+            - name: REDIS_URL
+              value: {{ .Values.config.redisUrl | quote }}
             - name: SES_SENDER_EMAIL
               value: {{ .Values.config.sesSenderEmail | quote }}
             - name: AWS_REGION

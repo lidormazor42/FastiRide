@@ -1,8 +1,10 @@
+import asyncio
 import base64
 import json
 import os
 import re
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from io import BytesIO
@@ -31,6 +33,11 @@ SESSION_SECRET = os.getenv("SESSION_SECRET", "fastiride-dev-secret-change-in-pro
 AWS_REGION        = os.getenv("AWS_REGION", "us-east-1")
 S3_UPLOADS_BUCKET = os.getenv("S3_UPLOADS_BUCKET", "")
 USE_REKOGNITION   = os.getenv("USE_REKOGNITION", "").lower() in ("1", "true", "yes")
+
+# Chat pub/sub bus. Unset = single-replica local delivery (tests, minimal
+# local setups) — see ChatRooms below.
+REDIS_URL    = os.getenv("REDIS_URL", "")
+redis_client = None  # set in the lifespan when REDIS_URL is configured
 
 Base.metadata.create_all(bind=engine)
 
@@ -69,7 +76,22 @@ if engine.dialect.name == "postgresql":
         """))
         _conn.commit()
 
-app = FastAPI()
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    global redis_client
+    subscriber_task = None
+    if REDIS_URL:
+        import redis.asyncio as aioredis
+        redis_client = aioredis.from_url(REDIS_URL)
+        subscriber_task = asyncio.create_task(_chat_subscriber())
+    yield
+    if subscriber_task:
+        subscriber_task.cancel()
+    if redis_client is not None:
+        await redis_client.aclose()
+
+
+app = FastAPI(lifespan=_lifespan)
 Instrumentator().instrument(app).expose(app)
 
 GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID")
@@ -837,9 +859,15 @@ def reject_join(
 
 
 # ── Ride chat (WebSocket) ─────────────────────────────────────────
-# Room registry: ride_id -> list of live WebSocket connections.
-# In-memory — fine for a single replica; scaling to multiple pods
-# requires pub/sub (e.g. Redis) so messages cross pod boundaries.
+# Room registry: ride_id -> list of live WebSocket connections ON THIS POD.
+# With REDIS_URL set, broadcast() only publishes to Redis, and a single
+# per-pod subscriber task (started in the lifespan below) delivers each
+# message to this pod's local sockets — including the originating pod's own.
+# That's what lets chat work correctly across 2+ backend replicas (HPA):
+# two users in the same ride may hold sockets on different pods, and Redis
+# is the bus that crosses that boundary. Without REDIS_URL (tests, local
+# minimal setups) broadcast() falls back to direct local delivery — same
+# behavior as the original single-replica implementation.
 class ChatRooms:
     def __init__(self):
         self.rooms: dict[int, list[WebSocket]] = {}
@@ -855,15 +883,46 @@ class ChatRooms:
         if not conns:
             self.rooms.pop(ride_id, None)
 
-    async def broadcast(self, ride_id: int, payload: dict):
+    async def deliver_local(self, ride_id: int, payload: dict):
         for ws in list(self.rooms.get(ride_id, [])):
             try:
                 await ws.send_json(payload)
             except Exception:
                 self.disconnect(ride_id, ws)
 
+    async def broadcast(self, ride_id: int, payload: dict):
+        if redis_client is not None:
+            await redis_client.publish(f"chat:{ride_id}", json.dumps(payload))
+        else:
+            await self.deliver_local(ride_id, payload)
+
 
 chat_rooms = ChatRooms()
+
+
+async def _chat_subscriber():
+    """Per-pod Redis subscriber: receives every chat message published by any
+    pod (including this one) and delivers to this pod's local sockets.
+    Reconnects on failure — a Redis blip must not silently kill chat for the
+    rest of the pod's life."""
+    while True:
+        try:
+            pubsub = redis_client.pubsub()
+            await pubsub.psubscribe("chat:*")
+            async for message in pubsub.listen():
+                if message["type"] != "pmessage":
+                    continue
+                try:
+                    ride_id = int(message["channel"].decode().split(":", 1)[1])
+                    payload = json.loads(message["data"])
+                except (ValueError, KeyError, json.JSONDecodeError):
+                    continue
+                await chat_rooms.deliver_local(ride_id, payload)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            print(f"[CHAT SUBSCRIBER] lost Redis connection, retrying in 2s: {e}")
+            await asyncio.sleep(2)
 
 
 def _can_access_chat(ride: models.Ride, user: models.User | None, db: Session) -> bool:

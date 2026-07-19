@@ -125,6 +125,9 @@ kubectl apply -f k8s/argocd/app-monitoring-prometheus.yaml
 kubectl apply -f k8s/argocd/app-monitoring-loki.yaml
 kubectl apply -f k8s/argocd/app-monitoring-grafana.yaml
 
+echo "==> Registering metrics-server with ArgoCD (Metrics API — required by HPA)"
+kubectl apply -f k8s/argocd/app-metrics-server.yaml
+
 echo "==> Waiting for ALB hostname to be assigned"
 ALB_HOSTNAME=""
 for i in $(seq 1 30); do

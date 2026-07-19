@@ -24,6 +24,8 @@ frontend:
 ingress:
   tlsEnabled: true
 config:
+  # In-namespace Redis service (redis-deployment.yaml) — the chat pub/sub bus
+  redisUrl: redis://redis:6379/0
   sesSenderEmail: noreply@fastiride.app
   awsRegion: us-east-1
   useRekognition: "true"
