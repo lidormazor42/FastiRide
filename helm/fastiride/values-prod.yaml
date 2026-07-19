@@ -1,7 +1,7 @@
 backend:
   image:
     tag: 6b487f27458cc00641504f10fe860bb5c9a556da # seed value — bumped ONLY by CI's promote-to-production job from here on (on a version-tag push, not every merge)
-  replicas: 1 # chat rooms live in-process memory — 2 replicas would split delivery across pods
+  replicas: 2 # chat now rides Redis pub/sub (cross-pod delivery verified on staging) — the old 1-replica pin is gone
   irsa:
     roleArn: "arn:aws:iam::439594592108:role/fastiride-dev-backend-irsa"
 frontend:
