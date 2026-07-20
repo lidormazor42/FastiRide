@@ -16,4 +16,4 @@ ingress:
 config:
   googleRedirectUri: https://staging.fastiride.app/api/auth/google/callback
 hpa:
-  enabled: false
+  enabled: true # bounds come from values.yaml (backend 2-6, frontend 2-4, CPU 70%)

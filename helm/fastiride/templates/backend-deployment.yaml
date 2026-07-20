@@ -59,8 +59,11 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
+          # Readiness checks the DB (pull from endpoints on failure); liveness
+          # stays shallow (restart only if the process itself is dead) — see
+          # the /api/ready vs /api/health docstrings in main.py.
           readinessProbe:
-            httpGet: { path: /api/health, port: 8000 }
+            httpGet: { path: /api/ready, port: 8000 }
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:

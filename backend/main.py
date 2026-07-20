@@ -118,7 +118,23 @@ def _get_user_from_cookie(session: str, db: Session) -> models.User | None:
 # ── Health ────────────────────────────────────────────────────────
 @app.get("/api/health")
 async def health():
+    """Liveness: is the process itself alive? Deliberately shallow — if this
+    checked the DB, a transient RDS blip would make kubelet RESTART perfectly
+    healthy pods (liveness failure = restart), turning a database hiccup into
+    a self-inflicted outage."""
     return {"status": "ok"}
+
+
+@app.get("/api/ready")
+def ready(db: Session = Depends(get_db)):
+    """Readiness: can this pod actually serve traffic? Checks the DB, so a pod
+    that lost its DB connection is pulled from Service endpoints (readiness
+    failure = no traffic) without being restarted."""
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        raise HTTPException(status_code=503, detail="database unreachable")
+    return {"status": "ready"}
 
 
 # ── Google OAuth ──────────────────────────────────────────────────
