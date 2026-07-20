@@ -24,3 +24,10 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+  # HPA owns the live replica count. Without this, selfHeal re-applies the
+  # Helm-rendered replicas every ~3min sync and fights every scale-out.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas

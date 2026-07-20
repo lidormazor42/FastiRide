@@ -27,3 +27,9 @@ spec:
             httpGet: { path: /, port: 80 }
             initialDelaySeconds: 5
             periodSeconds: 10
+          # Was missing entirely — a wedged nginx worker (still accepting TCP,
+          # not serving requests) would never get restarted without this.
+          livenessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 10
+            periodSeconds: 30
