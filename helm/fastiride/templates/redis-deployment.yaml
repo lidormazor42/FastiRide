@@ -20,14 +20,34 @@ spec:
       labels:
         app: redis
     spec:
+      # redis:7-alpine's own user is uid 999 / gid 1000. fsGroup makes the
+      # /data emptyDir writable by that user (same class of issue found and
+      # fixed for the frontend's nginx cache dir).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 1000
+        fsGroup: 1000
       containers:
         - name: redis
           image: redis:7-alpine
+          # No persistence by design (see the module-level comment) — disables
+          # RDB/AOF explicitly instead of relying on "no PVC" alone, so a
+          # read-only root filesystem never even attempts a background save.
+          command: ["redis-server", "--save", "", "--appendonly", "no"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 6379
           resources:
             requests: {cpu: 20m, memory: 32Mi}
             limits: {cpu: 100m, memory: 64Mi}
+          volumeMounts:
+            - name: data
+              mountPath: /data
           readinessProbe:
             exec:
               command: ["redis-cli", "ping"]
@@ -38,3 +58,6 @@ spec:
               command: ["redis-cli", "ping"]
             initialDelaySeconds: 10
             periodSeconds: 30
+      volumes:
+        - name: data
+          emptyDir: {}

@@ -16,12 +16,28 @@ spec:
         app: backend
     spec:
       serviceAccountName: backend
+      # appuser in the Dockerfile is uid/gid 1000 (first useradd on Debian slim).
+      # fsGroup so the /tmp emptyDir is actually writable by that user — see
+      # the identical issue (and fix) found for the frontend's nginx cache dir.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
       containers:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8000
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           env:
             - name: DATABASE_URL
               valueFrom:
@@ -70,3 +86,6 @@ spec:
             httpGet: { path: /api/health, port: 8000 }
             initialDelaySeconds: 30
             periodSeconds: 30
+      volumes:
+        - name: tmp
+          emptyDir: {}
