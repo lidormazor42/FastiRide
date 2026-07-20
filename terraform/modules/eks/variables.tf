@@ -35,6 +35,12 @@ variable "node_min_size" {
   default = 1
 }
 
+variable "public_access_cidrs" {
+  description = "CIDRs allowed to reach the EKS public API endpoint. Defaults to open (0.0.0.0/0) so a fresh apply never locks anyone out by surprise — narrow it explicitly via dev.tfvars."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
 variable "node_max_size" {
   type    = number
   default = 3

@@ -3,17 +3,22 @@ import base64
 import json
 import os
 import re
+import time
 import uuid
+from collections import deque
 from contextlib import asynccontextmanager
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from io import BytesIO
 from urllib.parse import urlencode
 from fastapi import (
-    FastAPI, Depends, HTTPException, UploadFile, File, Form, Cookie, Response,
-    WebSocket, WebSocketDisconnect, BackgroundTasks,
+    FastAPI, Depends, HTTPException, Request, UploadFile, File, Form, Cookie,
+    Response, WebSocket, WebSocketDisconnect, BackgroundTasks,
 )
 from fastapi.responses import RedirectResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
@@ -91,7 +96,22 @@ async def _lifespan(app: FastAPI):
         await redis_client.aclose()
 
 
+def _client_ip(request: Request) -> str:
+    """Requests arrive via the ALB, so request.client.host is the ALB target's
+    internal IP, not the real caller — read X-Forwarded-For (set by the ALB)
+    first, same reasoning as the ALB healthcheck-path fix on the Service."""
+    xff = request.headers.get("x-forwarded-for")
+    return xff.split(",")[0].strip() if xff else get_remote_address(request)
+
+
+# storage_uri uses the same Redis as chat pub/sub — required for the limit to
+# actually hold across replicas now that HPA can run several backend pods;
+# an in-memory limiter would let each pod give out its own separate quota.
+limiter = Limiter(key_func=_client_ip, storage_uri=REDIS_URL or "memory://")
+
 app = FastAPI(lifespan=_lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 Instrumentator().instrument(app).expose(app)
 
 GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID")
@@ -139,7 +159,8 @@ def ready(db: Session = Depends(get_db)):
 
 # ── Google OAuth ──────────────────────────────────────────────────
 @app.get("/api/auth/google")
-async def google_login():
+@limiter.limit("20/minute")
+async def google_login(request: Request):
     # Random per-login state, echoed back by Google and compared against a
     # short-lived cookie in the callback — a mismatch means the callback
     # wasn't initiated by this browser (login CSRF), so it's rejected.
@@ -354,7 +375,9 @@ def _archive_ticket_to_s3(content: bytes, event_id: int) -> None:
 
 
 @app.post("/api/validate")
+@limiter.limit("10/minute")
 async def validate(
+    request:  Request,
     event_id: int        = Form(...),
     file:     UploadFile = File(...),
     db:       Session    = Depends(get_db),
@@ -445,7 +468,9 @@ def get_events(db: Session = Depends(get_db)):
 
 
 @app.post("/api/events", response_model=schemas.EventOut)
+@limiter.limit("10/minute")
 def create_event(
+    request: Request,
     event: schemas.EventCreate,
     db: Session = Depends(get_db),
     session: str = Cookie(default=None),
@@ -639,7 +664,9 @@ def get_rides(
 
 
 @app.post("/api/rides", response_model=schemas.RideOut)
+@limiter.limit("10/minute")
 def create_ride(
+    request: Request,
     ride: schemas.RideCreate,
     db: Session = Depends(get_db),
     session: str = Cookie(default=None),
@@ -707,7 +734,9 @@ def delete_ride(
 
 
 @app.post("/api/rides/{ride_id}/join", response_model=schemas.RideRequestOut)
+@limiter.limit("20/minute")
 def join_ride(
+    request: Request,
     ride_id: int,
     req: schemas.RideRequestCreate,
     background_tasks: BackgroundTasks,
@@ -1083,6 +1112,9 @@ async def ride_chat(websocket: WebSocket, ride_id: int):
         user_name, user_email = user.name, user.email
 
     await chat_rooms.connect(ride_id, websocket)
+    # Per-connection sliding window — a flood from one tab shouldn't be able
+    # to hammer the DB with inserts or spam every other participant.
+    send_times: deque = deque(maxlen=10)
     try:
         while True:
             data = await websocket.receive_json()
@@ -1093,6 +1125,11 @@ async def ride_chat(websocket: WebSocket, ride_id: int):
             msg_text = (data.get("text") or "").strip()[:500]
             if not msg_text:
                 continue
+            now = time.monotonic()
+            if len(send_times) == send_times.maxlen and now - send_times[0] < 10:
+                await websocket.send_json({"type": "rate_limited"})
+                continue
+            send_times.append(now)
             with SessionLocal() as db:
                 msg = models.ChatMessage(
                     ride_id=ride_id,
