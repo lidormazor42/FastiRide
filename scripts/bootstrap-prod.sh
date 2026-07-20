@@ -128,6 +128,11 @@ kubectl apply -f k8s/argocd/app-monitoring-grafana.yaml
 echo "==> Registering metrics-server with ArgoCD (Metrics API — required by HPA)"
 kubectl apply -f k8s/argocd/app-metrics-server.yaml
 
+echo "==> Registering Karpenter with ArgoCD (node-level autoscaling — controller only)"
+echo "    EC2NodeClass/NodePool are NOT applied here — their subnet/SG IDs are per-apply"
+echo "    dynamic values, applied separately via scripts/karpenter-demo.sh when actually demoing."
+kubectl apply -f k8s/argocd/app-karpenter.yaml
+
 echo "==> Waiting for ALB hostname to be assigned"
 ALB_HOSTNAME=""
 for i in $(seq 1 30); do

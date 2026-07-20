@@ -1,0 +1,39 @@
+# Day 5 (conditional) — node-level autoscaling to complement HPA's pod-level
+# scaling. On-demand only, no spot (cost decision, see PROJECT_BOOK).
+# Role ARN and cluster name are deterministic for this account/project
+# (account 439594592108, cluster fastiride-dev) — hardcoded the same way
+# ingress.yaml already hardcodes the ACM certificate ARN, not templated.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: karpenter
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: public.ecr.aws/karpenter
+    chart: karpenter
+    targetRevision: 1.14.0
+    helm:
+      values: |
+        settings:
+          clusterName: fastiride-dev
+        serviceAccount:
+          annotations:
+            eks.amazonaws.com/role-arn: arn:aws:iam::439594592108:role/fastiride-dev-karpenter
+        replicas: 1
+        controller:
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 256Mi}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: karpenter
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -32,3 +32,13 @@ output "lbc_role_arn" {
   description = "ARN of the IAM role for AWS Load Balancer Controller"
   value       = aws_iam_role.lbc.arn
 }
+
+output "karpenter_role_arn" {
+  description = "ARN of the IAM role for the Karpenter controller (IRSA)"
+  value       = aws_iam_role.karpenter.arn
+}
+
+output "cluster_security_group_id" {
+  description = "EKS-managed cluster security group — used explicitly by Karpenter's EC2NodeClass instead of VPC discovery tags"
+  value       = aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+}
