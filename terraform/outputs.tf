@@ -41,6 +41,14 @@ output "lbc_role_arn" {
   value       = module.eks.lbc_role_arn
 }
 
+output "karpenter_role_arn" {
+  value = module.eks.karpenter_role_arn
+}
+
+output "cluster_security_group_id" {
+  value = module.eks.cluster_security_group_id
+}
+
 output "github_actions_role_arn" {
   description = "IAM role ARN GitHub Actions assumes via OIDC to push to ECR"
   value       = module.github_oidc.role_arn

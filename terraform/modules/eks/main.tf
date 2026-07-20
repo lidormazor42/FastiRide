@@ -282,3 +282,45 @@ resource "aws_iam_role_policy" "lbc" {
 
   policy = file("${path.module}/lbc-policy.json")
 }
+
+# ── IRSA: Karpenter controller ────────────────────────────────────────────────
+# Day 5 (conditional demo, see PROJECT_BOOK) — node-level autoscaling to
+# complement HPA's pod-level scaling. On-demand only, no spot (cost decision).
+resource "aws_iam_role" "karpenter" {
+  name = "fastiride-${var.environment}-karpenter"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      }
+      Condition = {
+        StringEquals = {
+          "${local.oidc_issuer}:sub" = "system:serviceaccount:karpenter:karpenter"
+          "${local.oidc_issuer}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+# Mutating actions (RunInstances/TerminateInstances/tagging) are scoped with
+# aws:RequestTag/aws:ResourceTag conditions to resources tagged for THIS
+# cluster only — Karpenter can never touch an EC2 instance it didn't create,
+# regardless of what else exists in the account.
+resource "aws_iam_role_policy" "karpenter" {
+  name = "karpenter-controller-policy"
+  role = aws_iam_role.karpenter.id
+
+  policy = templatefile("${path.module}/karpenter-policy.json", {
+    cluster_name  = aws_eks_cluster.main.name
+    node_role_arn = aws_iam_role.nodes.arn
+  })
+}
+# No separate instance profile resource needed: EC2NodeClass.spec.role (just
+# the role NAME, reusing the same aws_iam_role.nodes as the static managed
+# node group) lets Karpenter create/manage the instance profile itself —
+# already covered by the iam:*InstanceProfile* actions in karpenter-policy.json.
