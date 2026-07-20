@@ -14,3 +14,5 @@ config:
   googleRedirectUri: https://fastiride.app/api/auth/google/callback
 hpa:
   enabled: true # verified live on staging: 2->6 backend replicas under load (CPU 217%/70%), then scaled back down after
+networkPolicy:
+  enabled: true # verified live on staging: ALB routing intact, Prometheus scrape allowed, unrelated namespace + unlabeled same-namespace pod both genuinely blocked (000/timeout, not a no-op)
