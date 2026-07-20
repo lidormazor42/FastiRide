@@ -41,3 +41,6 @@ hpa:
     minReplicas: 2
     maxReplicas: 4
     cpuTarget: 70
+networkPolicy:
+  enabled: false # flip per-environment in values-staging/prod.yaml — verify on staging before prod, same rollout pattern as hpa.enabled
+  publicSubnetCidrs: ["10.0.1.0/24", "10.0.2.0/24"] # ALB (target-type "ip") lives here — must stay in sync with terraform/dev.tfvars

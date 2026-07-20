@@ -1,0 +1,82 @@
+{{- if .Values.networkPolicy.enabled }}
+# Default-deny all ingress in the namespace, then explicit allows below.
+# Egress is deliberately left untouched (policyTypes only lists Ingress) —
+# RDS, SES, Rekognition, S3, and DNS are all outbound calls from these pods,
+# and none of that needs touching. This only closes off pod-to-pod ingress
+# that has no reason to exist (e.g. a staging pod reaching a prod pod, since
+# both namespaces share the same flat cluster network by default).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+---
+# Backend receives traffic two ways: the ALB (target-type "ip", so it hits
+# pod IPs directly from the public subnets — see ingress.yaml's /api route)
+# and Prometheus scraping /metrics from the monitoring namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-allow-ingress
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - ipBlock: {cidr: {{ .Values.networkPolicy.publicSubnetCidrs | first | quote }}}
+        - ipBlock: {cidr: {{ .Values.networkPolicy.publicSubnetCidrs | last | quote }}}
+      ports:
+        - port: 8000
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 8000
+---
+# Frontend only ever receives ALB traffic (the ingress path "/" — see
+# ingress.yaml) — nothing in-cluster calls it, and it exposes no /metrics.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-allow-ingress
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - ipBlock: {cidr: {{ .Values.networkPolicy.publicSubnetCidrs | first | quote }}}
+        - ipBlock: {cidr: {{ .Values.networkPolicy.publicSubnetCidrs | last | quote }}}
+      ports:
+        - port: 8080
+---
+# Redis is the chat pub/sub bus — only the backend in this SAME namespace
+# should ever be able to reach it (no namespaceSelector = same-namespace by
+# default), never cross-namespace, never the ALB.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-allow-ingress
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: backend
+      ports:
+        - port: 6379
+{{- end }}
