@@ -1,0 +1,25 @@
+# Ensures voluntary disruptions (node drain, cluster upgrade, spot
+# interruption handling) can't take out every replica at once. minAvailable: 1
+# is safe against HPA's own floor (min 2 replicas on both tiers) — there's
+# always at least one spare to evict.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend
+  namespace: {{ .Release.Namespace }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend
+  namespace: {{ .Release.Namespace }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: frontend

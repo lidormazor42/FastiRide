@@ -21,7 +21,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import text
+from sqlalchemy import func, text
 from jose import jwt, JWTError
 import httpx
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -79,6 +79,17 @@ if engine.dialect.name == "postgresql":
             EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
             END $$;
         """))
+        # create_all only creates missing TABLES — it never retrofits an
+        # index=True added to a column of a table that already exists.
+        # These columns are filtered on in every hot-path query (ownership
+        # checks, join-request lookups, chat participant queries) and were
+        # never indexed since the columns predate index=True being added.
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_events_user_id ON user_events (user_id)"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_events_event_id ON user_events (event_id)"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_rides_event_id ON rides (event_id)"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_rides_driver_email ON rides (driver_email)"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_ride_requests_ride_id ON ride_requests (ride_id)"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_ride_requests_passenger_email ON ride_requests (passenger_email)"))
         _conn.commit()
 
 @asynccontextmanager
@@ -586,6 +597,15 @@ def get_event_attendees(
         raise HTTPException(status_code=404, detail="האירוע לא נמצא")
     _authorize_event_owner(event, session, db)
     rides = db.query(models.Ride).filter(models.Ride.event_id == event_id).all()
+    # One grouped query instead of one COUNT per ride (was N+1 — a producer
+    # with 50 rides fired 50 extra queries just to render this screen).
+    ride_ids = [r.id for r in rides]
+    approved_counts = dict(
+        db.query(models.RideRequest.ride_id, func.count())
+        .filter(models.RideRequest.ride_id.in_(ride_ids), models.RideRequest.status == "approved")
+        .group_by(models.RideRequest.ride_id)
+        .all()
+    ) if ride_ids else {}
     return {
         "validated_count": db.query(models.UserEvent).filter(models.UserEvent.event_id == event_id).count(),
         "rides_count": len(rides),
@@ -596,10 +616,7 @@ def get_event_attendees(
                 "city": r.city,
                 "departure_time": r.departure_time,
                 "seats_available": r.seats_available,
-                "approved_count": db.query(models.RideRequest).filter(
-                    models.RideRequest.ride_id == r.id,
-                    models.RideRequest.status == "approved",
-                ).count(),
+                "approved_count": approved_counts.get(r.id, 0),
             }
             for r in rides
         ],
@@ -1042,30 +1059,37 @@ def get_my_chats(session: str = Cookie(default=None), db: Session = Depends(get_
         ).all()
     }
 
+    # One query for every message across all these rides instead of 2 queries
+    # PER ride (last message + unread count) — was N+1, grouped in Python
+    # below since "last row per group" isn't portable between the Postgres
+    # this runs on and the sqlite the test suite uses.
+    all_messages = (
+        db.query(models.ChatMessage)
+        .filter(models.ChatMessage.ride_id.in_(ride_ids))
+        .order_by(models.ChatMessage.created_at.desc())
+        .all()
+    )
+    last_msg_by_ride = {}
+    unread_count_by_ride = {}
+    for m in all_messages:
+        last_msg_by_ride.setdefault(m.ride_id, m)
+        if m.sender_email != user.email:
+            read_at = reads.get(m.ride_id)
+            if not read_at or m.created_at > read_at:
+                unread_count_by_ride[m.ride_id] = unread_count_by_ride.get(m.ride_id, 0) + 1
+
     result = []
     for ride in rides:
-        last_msg = (
-            db.query(models.ChatMessage)
-            .filter(models.ChatMessage.ride_id == ride.id)
-            .order_by(models.ChatMessage.created_at.desc())
-            .first()
-        )
+        last_msg = last_msg_by_ride.get(ride.id)
         if not last_msg:
             continue
-        read_at = reads.get(ride.id)
-        unread_query = db.query(models.ChatMessage).filter(
-            models.ChatMessage.ride_id == ride.id,
-            models.ChatMessage.sender_email != user.email,
-        )
-        if read_at:
-            unread_query = unread_query.filter(models.ChatMessage.created_at > read_at)
         result.append({
             "ride_id":          ride.id,
             "ride_city":        ride.city,
             "ride_departure_time": ride.departure_time,
             "last_message":     last_msg.text,
             "last_message_at":  last_msg.created_at.isoformat(),
-            "unread_count":     unread_query.count(),
+            "unread_count":     unread_count_by_ride.get(ride.id, 0),
         })
     result.sort(key=lambda c: c["last_message_at"], reverse=True)
     return result
