@@ -160,8 +160,12 @@ resource "aws_eks_addon" "vpc_cni" {
     env = {
       ENABLE_PREFIX_DELEGATION = "true"
       WARM_PREFIX_TARGET       = "1"
-      ENABLE_NETWORK_POLICY    = "true" # required for NetworkPolicy objects to be enforced at all — off by default
     }
+    # Top-level field, NOT under env — confirmed via
+    # `aws eks describe-addon-configuration --addon-name vpc-cni`.
+    # Putting it under env (the first attempt) fails config validation:
+    # "is not defined in the schema and the schema does not allow additional properties".
+    enableNetworkPolicy = "true"
   })
 
   depends_on = [aws_eks_node_group.main]
