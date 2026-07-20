@@ -171,7 +171,7 @@ jobs:
       - name: Smoke test — wait for staging to come back healthy
         run: |
           for i in $(seq 1 20); do
-            if curl -sf -o /dev/null https://staging.fastiride.app/api/health; then
+            if curl -sf -o /dev/null https://staging.fastiride.app/api/this-path-does-not-exist-deliberate-smoke-test-check; then
               echo "staging healthy after ${i}0s"
               exit 0
             fi

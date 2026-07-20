@@ -19,3 +19,5 @@ hpa:
   enabled: true # bounds come from values.yaml (backend 2-6, frontend 2-4, CPU 70%)
 networkPolicy:
   enabled: true # verify here first — ALB routing + Prometheus scrape + redis chat all still need to work before this ever reaches prod
+# no-op touch: needed to trigger ci.yaml's paths filter for this PR (verifying
+# the new smoke test's failure path) — removed again in the follow-up revert
