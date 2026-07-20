@@ -24,8 +24,8 @@ class UserEvent(Base):
     __table_args__ = (UniqueConstraint("user_id", "event_id"),)
 
     id           = Column(Integer, primary_key=True, index=True)
-    user_id      = Column(Integer, ForeignKey("users.id"), nullable=False)
-    event_id     = Column(Integer, ForeignKey("events.id"), nullable=False)
+    user_id      = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    event_id     = Column(Integer, ForeignKey("events.id"), nullable=False, index=True)
     validated_at = Column(DateTime, default=datetime.utcnow)
 
     user  = relationship("User", back_populates="validated_events")
@@ -56,7 +56,7 @@ class Ride(Base):
     __tablename__ = "rides"
 
     id = Column(Integer, primary_key=True, index=True)
-    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False, index=True)
     driver_name = Column(String, nullable=False)
     city = Column(String, nullable=False)
     pickup_point = Column(String, nullable=False)
@@ -66,7 +66,7 @@ class Ride(Base):
     seats_available = Column(Integer, default=2)
     driver_age   = Column(Integer, nullable=True)
     driver_photo = Column(String, nullable=True)
-    driver_email = Column(String, nullable=True)
+    driver_email = Column(String, nullable=True, index=True)
     vehicle_type = Column(String, nullable=True)
     fuel_cost    = Column(Float, nullable=True)
     created_at   = Column(DateTime, default=datetime.utcnow)
@@ -79,9 +79,9 @@ class RideRequest(Base):
     __tablename__ = "ride_requests"
 
     id              = Column(Integer, primary_key=True, index=True)
-    ride_id         = Column(Integer, ForeignKey("rides.id"), nullable=False)
+    ride_id         = Column(Integer, ForeignKey("rides.id"), nullable=False, index=True)
     passenger_name  = Column(String, nullable=False)
-    passenger_email = Column(String, nullable=True)
+    passenger_email = Column(String, nullable=True, index=True)
     status          = Column(String, default="pending")
     created_at      = Column(DateTime, default=datetime.utcnow)
 
