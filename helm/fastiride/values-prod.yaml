@@ -13,4 +13,4 @@ ingress:
 config:
   googleRedirectUri: https://fastiride.app/api/auth/google/callback
 hpa:
-  enabled: false
+  enabled: true # verified live on staging: 2->6 backend replicas under load (CPU 217%/70%), then scaled back down after
