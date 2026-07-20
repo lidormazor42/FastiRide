@@ -15,21 +15,45 @@ spec:
       labels:
         app: frontend
     spec:
+      # nginx's own user in the official image is uid/gid 101. fsGroup is
+      # required: emptyDir volumes are root-owned by default, and nginx needs
+      # to mkdir subdirectories under /var/cache/nginx at startup — without
+      # this it fails with "Permission denied" (learned by testing locally).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
       containers:
         - name: frontend
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
-            - containerPort: 80
+            - containerPort: 8080
           resources:
             {{- toYaml .Values.frontend.resources | nindent 12 }}
+          volumeMounts:
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /run
           readinessProbe:
-            httpGet: { path: /, port: 80 }
+            httpGet: { path: /, port: 8080 }
             initialDelaySeconds: 5
             periodSeconds: 10
           # Was missing entirely — a wedged nginx worker (still accepting TCP,
           # not serving requests) would never get restarted without this.
           livenessProbe:
-            httpGet: { path: /, port: 80 }
+            httpGet: { path: /, port: 8080 }
             initialDelaySeconds: 10
             periodSeconds: 30
+      volumes:
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}

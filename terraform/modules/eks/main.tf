@@ -27,6 +27,7 @@ resource "aws_eks_cluster" "main" {
     subnet_ids              = var.subnet_ids
     endpoint_private_access = true
     endpoint_public_access  = true # set false in prod after VPN/bastion is ready
+    public_access_cidrs     = var.public_access_cidrs
   }
 
   depends_on = [aws_iam_role_policy_attachment.cluster_policy]

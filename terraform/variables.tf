@@ -63,3 +63,9 @@ variable "node_max_size" {
   type        = number
   default     = 3
 }
+
+variable "eks_public_access_cidrs" {
+  description = "CIDRs allowed to reach the EKS public API endpoint (kubectl/ArgoCD access). Defaults open — set explicitly in dev.tfvars to your current IP."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}

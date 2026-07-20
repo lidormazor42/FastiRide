@@ -21,6 +21,17 @@ def _fresh_db():
 
 
 @pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    """The Limiter's in-memory storage is a module-level singleton that
+    persists for the whole pytest session — without resetting it, tests that
+    hit the same rate-limited route (POST /api/rides, /api/events, ...) more
+    than the per-minute cap combined would start failing on 429, not because
+    of a real bug but because the TestClient always looks like one "IP"."""
+    main.limiter.reset()
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _no_real_emails(monkeypatch):
     """Tests must NEVER send real email. Learned the hard way: running pytest
     inside the local backend container (which loads real Gmail SMTP creds from

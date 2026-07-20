@@ -59,14 +59,15 @@ module "ecr" {
 module "eks" {
   source = "./modules/eks"
 
-  environment        = var.environment
-  vpc_id             = module.vpc.vpc_id
-  subnet_ids         = module.vpc.private_subnet_ids # nodes in private subnets
-  kubernetes_version = var.kubernetes_version
-  node_instance_type = var.node_instance_type
-  node_desired_size  = var.node_desired_size
-  node_min_size      = var.node_min_size
-  node_max_size      = var.node_max_size
+  environment         = var.environment
+  vpc_id              = module.vpc.vpc_id
+  subnet_ids          = module.vpc.private_subnet_ids # nodes in private subnets
+  kubernetes_version  = var.kubernetes_version
+  node_instance_type  = var.node_instance_type
+  node_desired_size   = var.node_desired_size
+  node_min_size       = var.node_min_size
+  node_max_size       = var.node_max_size
+  public_access_cidrs = var.eks_public_access_cidrs
 }
 
 # ── GitHub OIDC — lets GitHub Actions push to ECR without static AWS keys ─────
