@@ -3,7 +3,7 @@
 # role ARN (deterministic, hardcoded in k8s/argocd/app-karpenter.yaml).
 # Substituted and applied by scripts/karpenter-demo.sh, which reads the real
 # current values from `terraform output`.
-apiVersion: karpenter.k8s.aws/v1beta1
+apiVersion: karpenter.k8s.aws/v1
 kind: EC2NodeClass
 metadata:
   name: default
@@ -20,7 +20,7 @@ spec:
   tags:
     fastiride/purpose: karpenter-demo
 ---
-apiVersion: karpenter.sh/v1beta1
+apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
   name: default
@@ -28,6 +28,8 @@ spec:
   template:
     spec:
       nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
         name: default
       requirements:
         - key: karpenter.sh/capacity-type
