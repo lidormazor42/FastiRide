@@ -1,12 +1,12 @@
 backend:
   image:
-    tag: 13104d168fc748ef99bfedb72c30573f2a3b549a # seed value — bumped ONLY by CI's promote-to-production job from here on (on a version-tag push, not every merge)
+    tag: b8d8b03e7f6d69d16f91599fd595b28cd3019dab # seed value — bumped ONLY by CI's promote-to-production job from here on (on a version-tag push, not every merge)
   replicas: 2 # chat now rides Redis pub/sub (cross-pod delivery verified on staging) — the old 1-replica pin is gone
   irsa:
     roleArn: "arn:aws:iam::439594592108:role/fastiride-dev-backend-irsa"
 frontend:
   image:
-    tag: 13104d168fc748ef99bfedb72c30573f2a3b549a # seed value — bumped ONLY by CI's promote-to-production job from here on (on a version-tag push, not every merge)
+    tag: b8d8b03e7f6d69d16f91599fd595b28cd3019dab # seed value — bumped ONLY by CI's promote-to-production job from here on (on a version-tag push, not every merge)
   replicas: 2 # stateless (nginx serving static files) — safe to run >1, unlike backend
 ingress:
   host: fastiride.app
