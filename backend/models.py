@@ -69,9 +69,6 @@ class Ride(Base):
     driver_email = Column(String, nullable=True, index=True)
     vehicle_type = Column(String, nullable=True)
     fuel_cost    = Column(Float, nullable=True)
-    # Added as a live end-to-end proof that a real (non-baseline) Alembic
-    # migration deploys cleanly through staging/prod — see migrations/versions.
-    notes        = Column(Text, nullable=True)
     created_at   = Column(DateTime, default=datetime.utcnow)
 
     event = relationship("Event", back_populates="rides")
