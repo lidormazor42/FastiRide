@@ -28,7 +28,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.GH_PAT }}  # same reason as deploy-staging — main is protected
           ref: main                    # the tag points at a commit on main; write the promotion back onto main
