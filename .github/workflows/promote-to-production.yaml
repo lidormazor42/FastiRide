@@ -18,6 +18,12 @@ jobs:
   promote:
     name: Promote staging build to production
     runs-on: ubuntu-latest
+    # Requires manual approval in GitHub before this job runs at all (see the
+    # "production" environment's required-reviewer rule) — a version tag is
+    # a strong signal of intent already, but this adds an explicit, visible
+    # human click in GitHub itself before anything touches values-prod.yaml,
+    # not just "I typed the right git command."
+    environment: production
     permissions:
       contents: write
 

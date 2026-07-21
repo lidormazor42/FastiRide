@@ -1,0 +1,27 @@
+version: 2
+
+# Automated dependency PRs, complementing the Trivy scans in ci.yaml /
+# iac-quality.yaml: Trivy catches known CVEs in what's already pinned;
+# Dependabot proposes the version bump that actually fixes them, plus keeps
+# base images and Action versions from silently drifting out of date.
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

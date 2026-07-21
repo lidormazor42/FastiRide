@@ -22,6 +22,8 @@ jobs:
   lint:
     name: Lint Python
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -40,6 +42,8 @@ jobs:
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -66,6 +70,15 @@ jobs:
     needs: [lint, test]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Two quick pushes to main would otherwise race on the values-staging.yaml
+    # bump below (both jobs read the file, both try to commit+push — the
+    # second one's `git push` can fail on a non-fast-forward, or worse,
+    # overwrite the first one's tag with a stale one depending on timing).
+    # cancel-in-progress: false queues the second run instead of racing or
+    # killing a deploy mid-flight.
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
     permissions:
       contents: write   # needed to push image-tag commit back to repo
       id-token: write   # needed for OIDC auth (alternative to static keys)

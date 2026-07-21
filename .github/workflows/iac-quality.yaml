@@ -19,6 +19,8 @@ jobs:
   terraform:
     name: Terraform fmt + validate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -39,6 +41,8 @@ jobs:
   helm:
     name: Helm lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -50,6 +54,8 @@ jobs:
   security-scan:
     name: Trivy security scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
