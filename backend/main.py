@@ -44,53 +44,12 @@ USE_REKOGNITION   = os.getenv("USE_REKOGNITION", "").lower() in ("1", "true", "y
 REDIS_URL    = os.getenv("REDIS_URL", "")
 redis_client = None  # set in the lifespan when REDIS_URL is configured
 
-Base.metadata.create_all(bind=engine)
+# Postgres schema is owned by Alembic migrations (backend/migrations/) — the
+# initContainer runs `alembic upgrade head` before this app starts. sqlite
+# (the test suite) has no migrations and builds its schema directly here.
+if engine.dialect.name != "postgresql":
+    Base.metadata.create_all(bind=engine)
 
-# Add new columns to existing tables without Alembic — Postgres-only syntax
-# (ALTER COLUMN ... IF NOT EXISTS, DO $$ blocks); skipped under the sqlite
-# in-memory engine used by the test suite.
-if engine.dialect.name == "postgresql":
-    with engine.connect() as _conn:
-        _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS driver_age INTEGER"))
-        _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS driver_photo TEXT"))
-        _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS driver_email TEXT"))
-        _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS vehicle_type TEXT"))
-        _conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS logo_url TEXT"))
-        # ticket_prefix never had a real source of truth (producers don't control
-        # barcode formats issued by external ticketing platforms) — dropped.
-        _conn.execute(text("ALTER TABLE events DROP COLUMN IF EXISTS ticket_prefix"))
-        _conn.execute(text("ALTER TABLE ride_requests ADD COLUMN IF NOT EXISTS passenger_email TEXT"))
-        _conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS age INTEGER"))
-        _conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS city TEXT"))
-        _conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS owner_email TEXT"))
-        _conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS owner_phone TEXT"))
-        _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS return_city TEXT"))
-        _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS return_time TEXT"))
-        _conn.execute(text("ALTER TABLE rides ADD COLUMN IF NOT EXISTS fuel_cost DOUBLE PRECISION"))
-        # Precise-location picker was tried three times (address autocomplete, then a
-        # pin-drop map, then a Voyager/Israel-bounds restyle) and rejected each time —
-        # dropped for good, back to plain free-text geocoding for the map view.
-        _conn.execute(text("ALTER TABLE rides DROP COLUMN IF EXISTS pickup_lat"))
-        _conn.execute(text("ALTER TABLE rides DROP COLUMN IF EXISTS pickup_lng"))
-        _conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS reference_tickets TEXT"))
-        _conn.execute(text("""
-            DO $$ BEGIN
-                ALTER TABLE events ADD CONSTRAINT events_name_date_key UNIQUE (name, date);
-            EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
-            END $$;
-        """))
-        # create_all only creates missing TABLES — it never retrofits an
-        # index=True added to a column of a table that already exists.
-        # These columns are filtered on in every hot-path query (ownership
-        # checks, join-request lookups, chat participant queries) and were
-        # never indexed since the columns predate index=True being added.
-        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_events_user_id ON user_events (user_id)"))
-        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_events_event_id ON user_events (event_id)"))
-        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_rides_event_id ON rides (event_id)"))
-        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_rides_driver_email ON rides (driver_email)"))
-        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_ride_requests_ride_id ON ride_requests (ride_id)"))
-        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_ride_requests_passenger_email ON ride_requests (passenger_email)"))
-        _conn.commit()
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
