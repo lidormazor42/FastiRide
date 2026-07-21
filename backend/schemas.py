@@ -4,10 +4,6 @@ from typing import Optional, List
 from datetime import datetime
 
 
-class TicketRequest(BaseModel):
-    ticket_code: str
-
-
 class EventCreate(BaseModel):
     name: str
     location: Optional[str] = None
