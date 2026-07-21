@@ -110,7 +110,7 @@ jobs:
       # commit SHA (values-staging.yaml never reads it, nothing does), and it
       # was just a second push of the same layers for nothing.
       - name: Build & push backend
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           push: true
@@ -119,7 +119,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=backend
 
       - name: Build & push frontend
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./frontend
           push: true
