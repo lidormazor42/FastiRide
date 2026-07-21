@@ -13,4 +13,5 @@ node_modules/
 *.tfstate.backup
 vpc_plan
 *.tfvars.backup
+secrets.auto.tfvars
 design-system/

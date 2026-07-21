@@ -32,3 +32,19 @@ resource "aws_ssm_parameter" "grafana_admin_password" {
   type  = "SecureString"
   value = random_password.grafana_admin_password.result
 }
+
+# Google OAuth credentials — not generated (they come from Google Cloud
+# Console), just relayed into SSM so bootstrap-prod.sh has one consistent
+# source for every secret instead of reading these two specifically from
+# .env. See variables.tf for where the actual values come from.
+resource "aws_ssm_parameter" "google_client_id" {
+  name  = "/fastiride/${var.environment}/google-client-id"
+  type  = "SecureString"
+  value = var.google_client_id
+}
+
+resource "aws_ssm_parameter" "google_client_secret" {
+  name  = "/fastiride/${var.environment}/google-client-secret"
+  type  = "SecureString"
+  value = var.google_client_secret
+}

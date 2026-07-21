@@ -88,3 +88,13 @@ output "grafana_admin_password_parameter" {
   description = "SSM parameter name holding the Grafana admin password"
   value       = aws_ssm_parameter.grafana_admin_password.name
 }
+
+output "google_client_id_parameter" {
+  description = "SSM parameter name holding the Google OAuth client ID"
+  value       = aws_ssm_parameter.google_client_id.name
+}
+
+output "google_client_secret_parameter" {
+  description = "SSM parameter name holding the Google OAuth client secret"
+  value       = aws_ssm_parameter.google_client_secret.name
+}

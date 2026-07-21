@@ -19,11 +19,15 @@ ALB_HOSTED_ZONE_ID="Z35SXDOTRQ7X7K"   # fixed AWS constant for ALBs in us-east-1
 echo "==> Reading RDS master password from SSM"
 RDS_PASSWORD=$(aws ssm get-parameter --name "$RDS_SSM_PARAM" --with-decryption --region "$AWS_REGION" --query "Parameter.Value" --output text)
 
-echo "==> Reading app session secret + Grafana admin password from SSM (terraform/app-secrets.tf)"
+echo "==> Reading app session secret + Grafana admin password + Google OAuth creds from SSM (terraform/app-secrets.tf)"
 SESSION_SECRET_PARAM=$(terraform output -raw app_session_secret_parameter)
 GRAFANA_PASSWORD_PARAM=$(terraform output -raw grafana_admin_password_parameter)
+GOOGLE_CLIENT_ID_PARAM=$(terraform output -raw google_client_id_parameter)
+GOOGLE_CLIENT_SECRET_PARAM=$(terraform output -raw google_client_secret_parameter)
 SESSION_SECRET=$(aws ssm get-parameter --name "$SESSION_SECRET_PARAM" --with-decryption --region "$AWS_REGION" --query "Parameter.Value" --output text)
 GRAFANA_ADMIN_PASSWORD=$(aws ssm get-parameter --name "$GRAFANA_PASSWORD_PARAM" --with-decryption --region "$AWS_REGION" --query "Parameter.Value" --output text)
+GOOGLE_CLIENT_ID=$(aws ssm get-parameter --name "$GOOGLE_CLIENT_ID_PARAM" --with-decryption --region "$AWS_REGION" --query "Parameter.Value" --output text)
+GOOGLE_CLIENT_SECRET=$(aws ssm get-parameter --name "$GOOGLE_CLIENT_SECRET_PARAM" --with-decryption --region "$AWS_REGION" --query "Parameter.Value" --output text)
 
 echo "==> Connecting kubectl to $CLUSTER_NAME"
 aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
@@ -61,10 +65,8 @@ kubectl run rds-create-staging-db --image=postgres:16-alpine --rm -i --restart=N
     psql -h ${RDS_ENDPOINT%:*} -U fastiride -d fastiride -c 'CREATE DATABASE fastiride_staging'
   " 2>&1 || true
 
-echo "==> Loading secrets from .env"
+echo "==> Loading remaining secrets from .env (not yet in SSM)"
 cd ..
-GOOGLE_CLIENT_ID=$(grep '^GOOGLE_CLIENT_ID=' .env | cut -d= -f2-)
-GOOGLE_CLIENT_SECRET=$(grep '^GOOGLE_CLIENT_SECRET=' .env | cut -d= -f2-)
 ALERTMANAGER_SMTP_PASSWORD=$(grep '^ALERTMANAGER_SMTP_PASSWORD=' .env | cut -d= -f2-)
 
 echo "==> Creating fastiride-secrets (prod → 'fastiride' db, staging → 'fastiride_staging' db, same RDS instance)"
