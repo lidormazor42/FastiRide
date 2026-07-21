@@ -23,6 +23,11 @@ A ride-sharing platform for festival attendees — built as an end-to-end DevOps
 | Logs | Grafana Loki + Promtail | log aggregation without running an Elasticsearch cluster |
 | Alerting | Alertmanager → SES (email) | real notifications, not just dashboards nobody looks at |
 | Secrets | AWS SSM Parameter Store (SecureString) | nothing sensitive committed to Git |
+| Chat transport | Redis (pub/sub) | lets the backend run multiple replicas — a chat message from one pod reaches a client connected to another |
+| Rate limiting | slowapi, Redis-backed | shared quota across all replicas, not one per pod — protects the paid Rekognition call specifically |
+| Pod autoscaling | HPA (`metrics-server`) | backend 2-6 replicas / frontend 2-4, on real CPU load |
+| Node autoscaling | Karpenter | provisions an EC2 node in under a minute when HPA needs more room than the static nodes have, removes it once idle — on-demand only, no spot |
+| Network isolation | Kubernetes NetworkPolicy | default-deny-ingress per namespace + explicit allows (ALB, Prometheus, same-namespace redis) — verified to actually block, not just declared |
 
 ## Architecture
 
@@ -43,8 +48,10 @@ flowchart TB
 
         subgraph Private["Private subnets"]
             subgraph EKS["EKS Cluster"]
-                FE[frontend<br/>x2 replicas]
-                BE[backend<br/>x1 replica]
+                FE[frontend<br/>2-4 replicas, HPA]
+                BE[backend<br/>2-6 replicas, HPA]
+                Redis[(Redis<br/>chat pub/sub + rate limits)]
+                Karp[Karpenter<br/>node controller]
                 subgraph Monitoring["monitoring namespace"]
                     Prom[Prometheus]
                     Graf[Grafana]
@@ -59,6 +66,7 @@ flowchart TB
         ALB -->|/api| BE
         ALB -->|grafana.fastiride.app| Graf
         BE --> RDS
+        BE --> Redis
         BE -.->|outbound only| NAT --> IGW[Internet Gateway]
         Prom -->|scrapes /metrics| BE
         Graf --> Prom
@@ -99,7 +107,7 @@ Local Docker Compose is dev. On AWS, there are **two environments sharing one EK
 | Namespace | — | `fastiride-staging` | `fastiride-prod` |
 | Database | Postgres container | `fastiride_staging` (same RDS instance) | `fastiride` (same RDS instance) |
 | Deploys on | `docker compose up` | every merge to `main` (automatic) | a pushed version tag (`v1.2.0`) — deliberate, promotes the exact image already validated on staging |
-| Replicas | — | 1 backend / 1 frontend | 1 backend / 2 frontend |
+| Replicas | — | backend 2-6 / frontend 2-4 (HPA) | backend 2-6 / frontend 2-4 (HPA) |
 
 ### Git flow
 
@@ -123,6 +131,8 @@ That tag push triggers `promote-to-production.yaml`, a separate workflow that do
 | Hand-written Terraform modules, not the public registry ones | Custom `vpc`/`eks`/`rds`/etc. modules | Full control over exactly what gets created — easier to explain every single resource in an exam setting than a large third-party module with defaults you didn't choose |
 | One shared ALB, not two | Grafana's Ingress uses the same `alb.ingress.kubernetes.io/group.name` as the app's | Avoids paying for and managing a second load balancer just to expose a dashboard |
 | VPC CNI prefix delegation | `ENABLE_PREFIX_DELEGATION=true` + custom `maxPods` on the node launch template | Raised the pods-per-node ceiling from 17 to 110 for free, instead of adding a third EC2 node |
+| Karpenter: on-demand only, no spot | `capacity-type: ["on-demand"]` in the NodePool | Spot adds real complexity (interruption handling) for a demo whose whole point was proving the provisioning mechanism, not squeezing the last cent out of it |
+| No in-cluster Redis persistence | `redis:7-alpine`, `--save "" --appendonly no`, no PVC | It's pure transport (chat messages persist in Postgres, rate-limit counters are disposable) — a PVC would be paying for durability nothing needs |
 
 **Actual added cost of Monitoring:** ~$3.50/month (35GB of EBS storage for Prometheus/Loki/Grafana) — no extra compute (reuses existing node headroom) and no extra load balancer. This project runs almost entirely on the free part of the AWS bill; the two AWS Budget alerts in `terraform/budget-alerts.tf` exist specifically to catch anything that stops being true.
 
@@ -133,8 +143,9 @@ FastiRide/
 ├── backend/            FastAPI app, Dockerfile, tests/ (pytest)
 ├── frontend/            Nginx + HTML/JS, Dockerfile
 ├── terraform/           IaC — vpc, ecr, eks, rds, uploads (S3), dns, github-oidc, budget-alerts, ses-alerting
-├── helm/fastiride/       Helm chart — Deployments, Service, Ingress, HPA, Postgres backup CronJob
-├── k8s/argocd/           ArgoCD Applications (staging + prod + monitoring stack)
+├── helm/fastiride/       Helm chart — Deployments (backend/frontend/redis), Service, Ingress, HPA, PDB, NetworkPolicy, Postgres backup CronJob
+├── k8s/argocd/           ArgoCD Applications (staging + prod + monitoring stack + metrics-server + karpenter)
+├── k8s/karpenter/        EC2NodeClass/NodePool template — applied via scripts/karpenter-demo.sh (subnet/SG IDs are per-apply dynamic, not static)
 ├── monitoring/           Prometheus/Loki/Grafana values.yaml — deployed via ArgoCD, not manual helm
 ├── scripts/              bootstrap-prod.sh / teardown-prod.sh / derive-ses-smtp-password.py
 ├── .github/workflows/    ci.yaml (lint → pytest → build → deploy staging), promote-to-production.yaml (version tag)
@@ -199,7 +210,7 @@ Deletes the ArgoCD-managed apps first (so the ALB gets cleanly released), then d
 **The ride board:**
 ![Ride board](docs/images/app-board.png)
 
-**ArgoCD — all 5 Applications Synced/Healthy:**
+**ArgoCD — all Applications Synced/Healthy:**
 ![ArgoCD Applications](docs/images/argocd-apps.png)
 
 **Grafana — FastiRide Backend (RED method):**

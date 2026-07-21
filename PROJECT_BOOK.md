@@ -19,6 +19,8 @@ FastiRide היא פלטפורמת שיתוף נסיעות לפסטיבלים —
 - **Database:** Amazon RDS ל-PostgreSQL (במקור היה StatefulSet בתוך הקלאסטר — עבר מיגרציה אמיתית, ראו סעיף 13).
 - **אימות:** Google OAuth, session מבוסס JWT ב-cookie (המפתח החותם נשמר ב-SSM Parameter Store, לא בקוד).
 - **התראות:** Amazon SES למיילים לנהגים כשמישהו מצטרף/מבטל — תבניות HTML ממותגות בעיצוב האתר.
+- **צ'אט מבוזר:** הודעות הצ'אט עוברות דרך Redis pub/sub (deployment קטן פר-סביבה, ללא persistence — ההודעות עצמן נשמרות ב-Postgres). זה מה שמאפשר להריץ כמה replicas של ה-backend במקביל: הודעה שנשלחת דרך pod אחד מגיעה למשתמשים שמחוברים ל-pod אחר. אומת בפועל עם שני clients נעוצים לשני pods שונים על שני nodes שונים.
+- **הגנת עומס:** rate limiting (slowapi) מגובה Redis — כך המגבלה נאכפת גלובלית על פני כל ה-replicas, לא פר-pod. המגבלה החשובה ביותר: `/api/validate` (שמפעיל Rekognition בתשלום) מוגבל ל-10 בקשות לדקה per-IP. זיהוי ה-IP קורא `X-Forwarded-For` (שה-ALB מציב) — בלי זה כל הבקשות היו נראות כאילו הגיעו מה-ALB עצמו.
 - **אימות כרטיסים — החלטת תכנון:** ה-OCR הראשי הוא AWS Rekognition (מנוהל, בלי תלויות native), אבל pytesseract נשאר בכוונה כ-fallback מקומי — כך האפליקציה עובדת גם ב-docker compose מקומי בלי חיבור ל-AWS. זו לא שארית ישנה אלא degradation מדורג מכוון: ענן קודם, מקומי כגיבוי.
 
 ## 4. ארכיטקטורת המערכת
@@ -39,6 +41,10 @@ FastiRide היא פלטפורמת שיתוף נסיעות לפסטיבלים —
 | **Grafana** | מציג את המדדים כדשבורדים — כולל דשבורד מותאם אישית שבניתי לפי שיטת RED (Rate/Errors/Duration) |
 | **Loki** | אוסף לוגים מכל ה-pods (חלופה קלה יותר ל-Elasticsearch) |
 | **Alertmanager** | שולח **מייל אמיתי** כשמשהו לא תקין — לא רק "יש דשבורד שאיש לא מסתכל עליו" |
+| **Redis** | הבאס של הצ'אט (pub/sub בין replicas של ה-backend) + ה-storage של ה-rate limiter — טרנספורט בלבד, בלי persistence |
+| **metrics-server** | ה-Metrics API של הקלאסטר (`kubectl top`) — התנאי המקדים ל-HPA; מותקן דרך ArgoCD כמו כל השאר |
+| **HPA** | סקיילינג ברמת ה-pods: backend 2-6 replicas, frontend 2-4, לפי CPU 70% — אומת חי תחת עומס אמיתי (2→6 ובחזרה) |
+| **Karpenter** | סקיילינג ברמת ה-nodes: כשה-pods לא נכנסים ב-capacity הקיים, מסופק node חדש תוך ~40 שניות ונמחק אוטומטית כשמתרוקן (הודגם חי, on-demand בלבד ללא spot — החלטת עלות) |
 
 ## 6. תהליך העבודה
 
@@ -59,7 +65,9 @@ FastiRide היא פלטפורמת שיתוף נסיעות לפסטיבלים —
 
 ## 8. Kubernetes
 
-משאבים בשימוש: `Deployment` (backend, frontend — עם resources requests/limits אמיתיים), `Service`, `Ingress` (עם AWS Load Balancer Controller, ALB אחד משותף לאפליקציה ול-Grafana), `HPA` (מוגדר, כבוי כברירת מחדל בפרויקט קטן זה), ו-`CronJob` (גיבוי יומי של ה-DB ל-S3). **Pod** הוא יחידת הריצה הבסיסית (container אחד או יותר, רשת/אחסון משותפים); **Deployment** שומר על מספר replicas רצוי ומחליף pods שנופלים; **Service** נותן DNS/IP יציב לקבוצת pods גם כשהם מוחלפים.
+משאבים בשימוש: `Deployment` (backend, frontend, redis — עם resources requests/limits אמיתיים ו-`securityContext` מלא: `runAsNonRoot`, `readOnlyRootFilesystem`, `capabilities: drop: [ALL]`), `Service`, `Ingress` (עם AWS Load Balancer Controller, ALB אחד משותף לאפליקציה ול-Grafana), `HPA` (**פעיל** על שני ה-tiers — backend 2-6 replicas, frontend 2-4, לפי CPU 70% — אומת חי תחת עומס אמיתי), `PodDisruptionBudget` (minAvailable:1, כדי שתחזוקת node לא תוריד את כל ה-replicas בבת אחת), `NetworkPolicy` (default-deny-ingress פר-namespace + allow מפורש ל-ALB/Prometheus/redis בלבד — אומת עם בדיקות חסימה אמיתיות, לא רק "קיים"), ו-`CronJob` (גיבוי יומי של ה-DB ל-S3). **Pod** הוא יחידת הריצה הבסיסית (container אחד או יותר, רשת/אחסון משותפים); **Deployment** שומר על מספר replicas רצוי ומחליף pods שנופלים; **Service** נותן DNS/IP יציב לקבוצת pods גם כשהם מוחלפים.
+
+**סקיילינג בשתי רמות — Pod ו-Node:** HPA (`Horizontal Pod Autoscaler`) מוסיף/מוריד **pods** לפי עומס CPU בתוך ה-nodes הקיימים. **Karpenter** (מותקן דרך ArgoCD, לא helm ידני) פותר את השכבה שמתחתיו: כש-HPA כבר רוצה יותר pods ממה שה-nodes הקיימים יכולים להכיל (pods נתקעים `Pending`), Karpenter מספק **node** חדש (EC2, on-demand בלבד — בלי spot, החלטת עלות) תוך פחות מדקה, ומוריד אותו אוטומטית כשהוא מתפנה (`consolidationPolicy: WhenEmptyOrUnderutilized`). הודגם חי: הרחבת ה-backend מעבר ל-capacity הפיזי הקיים הביאה לשני nodes חדשים תוך ~40 שניות, ולמחיקתם האוטומטית תוך ~90 שניות אחרי שהתפנו — Karpenter אפילו רושם את החיסכון הכספי המדויק בלוגים שלו.
 
 ## 9. Docker
 
@@ -70,6 +78,8 @@ Dockerfile ייעודי ל-backend ול-frontend. ה-backend דורש ספריו
 ## 10. Terraform
 
 כל התשתית תחת `terraform/`, עם state מרוחק ב-S3 (לא local state file) **ונעילת state** (`use_lockfile = true` — נעילה native ב-S3 מ-Terraform 1.10, בלי צורך בטבלת DynamoDB) שמונעת משני `apply` מקבילים להשחית את ה-state. מודולים: `vpc`, `eks`, `rds`, `uploads` (S3), `dns` (Route53), `github-oidc`. כל מודול אחראי על משאב AWS אחד — לא קובץ ענק אחד עם הכל מעורבב.
+
+**הקשחה נוספת בשבוע ההרחבה:** ה-API endpoint הציבורי של EKS מוגבל ל-IP ספציפי בלבד (`eks_public_access_cidrs` — כברירת מחדל פתוח, כדי ש-`apply` נקי לעולם לא ינעל מישהו בטעות; GitHub Actions לא צריך גישה לזה בכלל, הוא מדבר רק עם ECR). נוסף IRSA role + מדיניות IAM מצומצמת ל-controller של Karpenter (מבוססת על התבנית הרשמית של AWS, עם תנאי `RequestTag`/`ResourceTag` שמוודאים שהוא לעולם לא יכול לגעת ב-instance שהוא לא יצר בעצמו).
 
 **ניהול סודות — הכל דרך SSM Parameter Store (SecureString):** סיסמת ה-RDS, המפתח שחותם sessions של משתמשים, וסיסמת ה-admin של Grafana — כולם נוצרים ב-`random_password` של Terraform ונשמרים ב-SSM. אף סוד לא מופיע בקוד או ב-Git; סקריפט ה-bootstrap קורא אותם מ-SSM בזמן הקמה ובונה מהם Kubernetes Secrets. (במקור סיסמת Grafana וה-session secret היו hardcoded בסקריפט — זוהה ותוקן ב-audit אבטחה לפני ההגשה.)
 
@@ -112,6 +122,16 @@ Prometheus + Grafana + Loki + Alertmanager — **כולם עצמם פרוסים 
 **ArgoCD לא הצליח לסנכרן את ה-CRDs של Prometheus.** בהקמת קלאסטר מלאה, `monitoring-prometheus` נתקע ב-`OutOfSync` עם שגיאה `metadata.annotations: Too long: may not be more than 262144 bytes`. הסיבה: ה-CRDs של kube-prometheus-stack גדולים מספיק שה-annotation של client-side apply (`last-applied-configuration`, ששומר את כל הקונפיגורציה הקודמת לצורך 3-way diff) חורג מהמגבלה של Kubernetes על annotations. הפתרון המתועד: `syncOptions: [ServerSideApply=true]`, ששומר בעלות per-field במקום annotation שלם. בעיה שנייה, נסתרת יותר, צצה מיד אחרי: ה-Prometheus Operator עצמו **עלה לפני** שה-CRDs נוצרו בהצלחה, רשם בלוג "resource not installed" בזמן ה-startup, ולא בדק שוב מעולם — נדרש `kubectl rollout restart` ידני כדי שיגלה מחדש את ה-CRDs שכבר קיימים. לקח: race condition בזמן bootstrap יכול "להיתקע" ברכיב שכבר עלה, לא רק במשאב שעדיין לא נוצר — restart הוא כלי אבחון לגיטימי, לא רק "פתרון קסם".
 
 **אימות כרטיסים היה ניתן לעקיפה מלאה — תוקן אחרי דיון על מודל האיום.** הבדיקה המקורית (`_ticket_matches`) בדקה רק אם מילות שם האירוע מופיעות בטקסט שזוהה בתמונה (OCR/ברקוד) — עקיפה טריוויאלית: כל תמונה עם הטקסט הנכון "כתוב עליה" בעורך תמונות עברה. התיקון עבר כמה סבבי חשיבה אמיתיים: קודם נבדקה אפשרות לחבר API למערכת הכרטיסים של המפיק — נפסלה, כי (א) לא ריאלית טכנית מול פלטפורמות כרטוס שונות ללא הסכם עסקי, ו-(ב) **גם אם הייתה ריאלית, לא הייתה סוגרת את הסיכון האמיתי** — כרטיס הוא מוצר שכל אחד יכול לרכוש, כולל גורם עוין; אימות "זה כרטיס אמיתי" לא שקול לבדיקת זהות. ההבנה המשמעותית: בתרבות הפסטיבלים בישראל מפיקים מבצעים בפועל סלקציה על מי מקבל כרטיס — כך שאימות "האם זה כרטיס אמיתי שהמפיק הנפיק" יורש בעקיפין את תהליך הסלקציה שהמפיק כבר ביצע. הפתרון הסופי, שכבות: (1) ברקוד/QR קריא הפך לחובה — סוגר "אין בכלל כרטיס אמיתי"; (2) המפיק יכול להעלות (אופציונלי, בזמן יצירת האירוע, ניתן להוסיף עוד בכל שלב) דוגמאות של כרטיסים אמיתיים; (3) כשקיימות דוגמאות, **דמיון חזותי (average-hash, ללא תלות חדשה) הוא הסימן היחיד שמחליט — טקסט לא משתתף בהחלטה בכלל**, כי טקסט הוא בדיוק מה שתוקף שולט בו; ניסיון ראשוני שכלל fallback לטקסט כשהדמיון החזותי נכשל התגלה כפרצה מחדש (בדיוק שם תוקף עם כרטיס ישן+טקסט מזויף היה עובר) ותוקן. אומת עם תמונות סינתטיות: כרטיס ישן עם שם מודבק (עיצוב שונה, ברקוד אמיתי) — נחסם; קונה מסבב מכירה שני (אותה תבנית, תווית שונה) — עדיין עובר, כי hash תפיסתי סלחני לשינויים מקומיים קטנים ונוקשה רק כלפי עיצוב שונה לגמרי.
+
+**GitOps skew — chart משתנה מיד, image tag לא (פעמיים, אותו לקח).** Helm chart (Deployment/Service/Probe specs) עוקב אחרי `main` **בשתי הסביבות בו-זמנית** דרך ArgoCD, בלי קשר לתיוג גרסה — רק `image.tag` נשאר קפוא עד promotion מפורש. פעמיים באותו שבוע שינוי ב-chart "רץ קדימה" מול ה-image הישן שעדיין רץ ב-prod: פעם ראשונה כש-`readinessProbe` עבר ל-`/api/ready` (endpoint שלא היה קיים ב-image הישן — `fastiride.app` החזיר 503 בכל בקשה), פעם שנייה כש-nginx עבר להאזין על פורט 8080 (ה-Service ניתב את כולם לפורט הזה מיד, אבל ה-image הישן עדיין האזין על 80 — 502 על כל בקשה, גם מ-pods ש"עברו" את ה-probe הישן שלהם). שני המקרים תוקנו זהה: תיוג גרסה מיידי שמקדם את ה-image המתאים. **לקח קבוע:** כל שינוי בפורט/probe/מבנה container חייב קידום גרסה מיד, לא "בסוף השבוע" — אחרת prod שובר את עצמו לבד.
+
+**Karpenter — גרסת API שגויה, לא בעיית CRD.** מטא-דאטה של ה-Helm chart טענה `v1beta1` ל-EC2NodeClass/NodePool, אבל הגרסה שבאמת מותקנת ב-chart 1.14.0 היא `v1` — התגלה רק בבדיקה ישירה מול ה-CRD החי (`kubectl get crd ... -o jsonpath='{.spec.versions[*].name}'`), לא מהתיעוד. גם `nodeClassRef` ב-v1 דורש `group`/`kind` מפורשים, לא רק `name`. **לקח:** metadata של chart יכולה להיות לא מעודכנת — הבדיקה האמינה היחידה היא מול ה-CRD בפועל.
+
+**סכימת VPC CNI addon — לא כל env var אמיתי.** ניסיון ראשון להפעיל NetworkPolicy הציב `ENABLE_NETWORK_POLICY` תחת `env` (לצד שתי הגדרות דומות שכן שם) — נכשל מיד באימות הסכימה של `terraform apply` עצמו (בלי לגעת בכלום). המפתח הנכון הוא שדה ברמה עליונה, `enableNetworkPolicy` — התגלה דרך `aws eks describe-addon-configuration`. **לקח:** תמיד לבדוק את הסכימה בפועל של addon, לא להניח שכל env var דומה נכנס לאותו מקום.
+
+**CI לא מופעל משינוי בעצמו.** `ci.yaml` מוגדר עם `paths:` filter על `backend/**`/`frontend/**`/`helm/**` — שינוי בקובץ ה-workflow עצמו **לא** מפעיל אותו. התגלה כשניסיתי לבדוק שינוי ב-CI ו-`deploy-staging` פשוט לא רץ. נדרש לצרף שינוי אמיתי באחת התיקיות האלה כדי לבדוק שינוי ב-CI עצמו.
+
+**SES sandbox — בקשת production access נדחתה.** למרות תשובה מפורטת ומקצועית לכל שאלה שנשאלה, AWS דחו את הבקשה (סביר להניח סקירה אוטומטית לפי גיל/היסטוריית חשבון, לא תוכן הבקשה). **פתרון עוקף שנבחר במקום להמתין:** אימות ידני של כתובות מייל ספציפיות ב-SES (עדיין sandbox, אבל מבטיח שהמיילים יעבדו בהדגמה). מתועד כהחלטה מודעת, לא כפער נסתר — ה-sandbox עדיין פעיל, וכתובת שאינה מאומתת לא תקבל מייל.
 
 ## 14. תמונות קוד
 
@@ -161,7 +181,13 @@ ArgoCD סורק את ה-repo כל ~2 דקות, ורואה שקובץ ה-values �
 ב-AWS SSM Parameter Store, כ-SecureString: סיסמת RDS, מפתח חתימת ה-sessions, סיסמת Grafana. נוצרים על ידי Terraform (`random_password`), נקראים על ידי סקריפט ה-bootstrap שבונה מהם Kubernetes Secrets. שום סוד לא נמצא ב-Git — ה-`.env` המקומי ב-`.gitignore`, וההרשאות בקלאסטר מבוססות IRSA (תפקיד IAM לכל ServiceAccount) בלי מפתחות סטטיים.
 
 **מה קורה אם ה-DB נמחק?**
-CronJob יומי מריץ `pg_dump`, דוחס ומעלה ל-S3 (`db-backups/`), עם ההרשאות של אותו IRSA role שכבר יש ל-backend (בלי IAM חדש). בנוסף, RDS מנוהל עם גיבויים אוטומטיים של AWS. השחזור: `pg_restore` מהקובץ האחרון ב-S3.
+CronJob יומי מריץ `pg_dump`, דוחס ומעלה ל-S3 (`db-backups/`), עם ההרשאות של אותו IRSA role שכבר יש ל-backend (בלי IAM חדש). בנוסף, RDS מנוהל עם גיבויים אוטומטיים של AWS. השחזור: `gunzip -c backup.sql.gz | psql $DATABASE_URL` — **לא** `pg_restore` (זה מיועד לפורמט custom של pg_dump; כאן זה dump טקסטואלי רגיל, `psql` הוא הכלי הנכון). התרגיל נבדק בפועל: נזרעה רשומת בדיקה אמיתית, נלקח גיבוי, שוחזר ל-database זמני נפרד (לא נגעו בנתונים האמיתיים), אומת שהרשומה המדויקת שרדה, ונוקה.
+
+**מה ההבדל בין HPA ל-Karpenter?**
+שתי שכבות סקיילינג שונות לגמרי. HPA מוסיף/מוריד **pods** בתוך ה-nodes הקיימים, לפי מדד (CPU/memory) — לא נוגע ב-infrastructure. Karpenter פותר את מה שקורה כש-HPA כבר רוצה יותר pods ממה שה-nodes הקיימים סופקים (pods נתקעים `Pending`) — הוא מספק **node** אמיתי (EC2) תוך פחות מדקה, ומוריד אותו אוטומטית כשהוא ריק. שניהם עובדים יחד: HPA מזהה עומס ברמת האפליקציה, Karpenter מזהה חוסר capacity ברמת ה-infrastructure.
+
+**איך NetworkPolicy מגן על הקלאסטר?**
+ברירת המחדל ב-Kubernetes: כל pod יכול לדבר עם כל pod אחר בקלאסטר, כולל בין namespaces (staging יכול לדבר עם prod!). NetworkPolicy הופך את זה ל-deny-by-default: חסימת כל תעבורה נכנסת, ואז allow מפורש רק למה שבאמת צריך — ה-ALB (subnet ציבורי) ל-backend/frontend, Prometheus (namespace נפרד) ל-backend:8000 בלבד, וה-backend בלבד ל-redis. נבדק בפועל עם pod זמני: namespace לא-מורשה מקבל timeout אמיתי (לא 403 — חסימת רשת בפועל), לא רק "המדיניות קיימת".
 
 **איך אתה יודע שהמערכת בריאה עכשיו?**
 שלוש שכבות: probes של Kubernetes (liveness/readiness על כל pod), דשבורד RED ב-Grafana (Rate/Errors/Duration על ה-API האמיתי), ו-Alertmanager ששולח מייל אמיתי דרך SES אם alert נדלק — כולל alert על backend שלא מגיב.
