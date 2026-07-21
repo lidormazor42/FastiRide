@@ -24,6 +24,30 @@ spec:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
+      # Runs `alembic upgrade head` to completion before the app container
+      # starts — same image, same DB creds, so schema is always migrated
+      # before any replica can serve traffic. A rollout with N replicas still
+      # only runs this once per new Pod, and alembic_version makes re-runs on
+      # an already-migrated DB a no-op, so this is also safe on every restart.
+      initContainers:
+        - name: migrate
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          command: ["alembic", "upgrade", "head"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: fastiride-secrets
+                  key: database-url
       containers:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
