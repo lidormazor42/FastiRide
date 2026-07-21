@@ -78,11 +78,11 @@ Dockerfile ייעודי ל-backend ול-frontend. ה-backend דורש ספריו
 
 ## 10. Terraform
 
-כל התשתית תחת `terraform/`, עם state מרוחק ב-S3 (לא local state file) **ונעילת state** (`use_lockfile = true` — נעילה native ב-S3 מ-Terraform 1.10, בלי צורך בטבלת DynamoDB) שמונעת משני `apply` מקבילים להשחית את ה-state. מודולים: `vpc`, `eks`, `rds`, `uploads` (S3), `dns` (Route53), `github-oidc`. כל מודול אחראי על משאב AWS אחד — לא קובץ ענק אחד עם הכל מעורבב.
+כל התשתית תחת `terraform/`, עם state מרוחק ב-S3 (לא local state file) **ונעילת state** (`use_lockfile = true` — נעילה native ב-S3 מ-Terraform 1.10, בלי צורך בטבלת DynamoDB) שמונעת משני `apply` מקבילים להשחית את ה-state. מודולים: `vpc`, `ecr`, `eks`, `rds`, `uploads` (S3), `dns` (Route53), `github-oidc`. כל מודול אחראי על משאב AWS אחד — לא קובץ ענק אחד עם הכל מעורבב.
 
 **הקשחה נוספת בשבוע ההרחבה:** ה-API endpoint הציבורי של EKS מוגבל ל-IP ספציפי בלבד (`eks_public_access_cidrs` — כברירת מחדל פתוח, כדי ש-`apply` נקי לעולם לא ינעל מישהו בטעות; GitHub Actions לא צריך גישה לזה בכלל, הוא מדבר רק עם ECR). נוסף IRSA role + מדיניות IAM מצומצמת ל-controller של Karpenter (מבוססת על התבנית הרשמית של AWS, עם תנאי `RequestTag`/`ResourceTag` שמוודאים שהוא לעולם לא יכול לגעת ב-instance שהוא לא יצר בעצמו).
 
-**ניהול סודות — הכל דרך SSM Parameter Store (SecureString):** סיסמת ה-RDS, המפתח שחותם sessions של משתמשים, וסיסמת ה-admin של Grafana — כולם נוצרים ב-`random_password` של Terraform ונשמרים ב-SSM. אף סוד לא מופיע בקוד או ב-Git; סקריפט ה-bootstrap קורא אותם מ-SSM בזמן הקמה ובונה מהם Kubernetes Secrets. (במקור סיסמת Grafana וה-session secret היו hardcoded בסקריפט — זוהה ותוקן ב-audit אבטחה לפני ההגשה.)
+**ניהול סודות — הכל דרך SSM Parameter Store (SecureString):** סיסמת ה-RDS, המפתח שחותם sessions של משתמשים, סיסמת ה-admin של Grafana, ו-Google OAuth client ID/secret — כולם ב-SSM. הרוב נוצרים ישירות ב-`random_password` של Terraform; ה-Google OAuth הם היוצא מן הכלל (מגיעים מ-Google Cloud Console, לא ניתנים ליצירה אוטומטית) — מוזרקים דרך `secrets.auto.tfvars` מקומי (ב-`.gitignore`) ומשם ל-SSM כמו כל השאר, במקום להיקרא ישירות מ-`.env` כמו שהיה עד שלב הגימור. אף סוד לא מופיע בקוד או ב-Git; סקריפט ה-bootstrap קורא אותם מ-SSM בזמן הקמה ובונה מהם Kubernetes Secrets. (במקור סיסמת Grafana וה-session secret היו hardcoded בסקריפט — זוהה ותוקן ב-audit אבטחה לפני ההגשה.)
 
 ## 11. Monitoring
 
