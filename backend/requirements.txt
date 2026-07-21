@@ -13,4 +13,4 @@ python-jose[cryptography]==3.4.0
 prometheus-fastapi-instrumentator==7.0.0
 redis==5.0.4
 slowapi==0.1.9
-pytest==8.2.2
+pytest==9.1.1
