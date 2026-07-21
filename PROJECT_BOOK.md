@@ -150,7 +150,13 @@ Recommended representative code snippets to capture and add here:
 
 ## 15. Personal Summary
 
-_(To be written personally — what you learned, what was the most challenging part, what you'd do differently next time)_
+_(Draft below — read it, cut/rewrite anything that doesn't sound like you, add anything real that's missing. It's meant as a starting point, not a final answer.)_
+
+This project changed what I think "finishing" a feature actually means. Early on, building something meant getting it to work once, locally, and moving on. By the end, "done" meant something much narrower: deployed through the same pipeline as everything else, verified against real traffic on staging before touching production, and — critically — not secretly fragile in a way I'd only discover under pressure. The clearest example of that shift is Alembic. For most of the project, schema changes went through a manual `ALTER TABLE IF NOT EXISTS` block, and it worked fine — until I was asked directly whether that was really good enough for a DevOps project, and had to admit it wasn't. Replacing it properly, and then actually proving both an upgrade and a rollback against a live database, was the single most useful exercise of the whole project: it's the difference between infrastructure that happens to work and infrastructure you can trust.
+
+The most challenging part wasn't any one technology — it was the same failure mode showing up three separate times: a Helm chart change reaching both staging and production instantly through ArgoCD, while the running image stayed pinned to an older version that didn't support it yet. The first time it caused a 503, the second a 502, the third time zero working replicas in production. Each time the fix was the same — promote a version tag immediately — but it took three real incidents before the lesson actually stuck: a chart and an image are two separate promises, and forgetting that is how a change that looks safe in Git turns into an outage nobody saw coming.
+
+If I did this again, I'd build that discipline in from day one instead of learning it the hard way three times, and I'd bring in Alembic — and probably a Redis-backed chat and rate limiter — from the start rather than retrofitting them under deadline pressure. I'd also take the backup story more seriously earlier: the daily backup CronJob went unverified for weeks simply because the cluster was never up at the hour it was scheduled to run, and that's exactly the kind of gap that only matters on the one day you actually need it.
 
 ---
 
