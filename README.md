@@ -5,6 +5,18 @@
 
 A ride-sharing platform for festival attendees — built as an end-to-end DevOps capstone project. The app itself (who's driving where) is secondary to the point of the exercise: a real application, fully containerized, deployed to a managed Kubernetes cluster on AWS, with GitOps continuous delivery and full observability, defined entirely as code.
 
+## Table of Contents
+
+- [Stack](#stack)
+- [Architecture](#architecture)
+- [Environments](#environments)
+- [Git Flow](#git-flow)
+- [FinOps Decision Log](#finops-decision-log)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Screenshots](#screenshots)
+- [Managing the Cluster with k9s](#managing-the-cluster-with-k9s)
+
 ## Stack
 
 | Layer | Technology | Why |
