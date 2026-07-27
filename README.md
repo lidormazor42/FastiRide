@@ -237,7 +237,9 @@ Deletes the ArgoCD-managed apps first (so the ALB gets cleanly released), then d
 **RDS — managed PostgreSQL, `available`:**
 ![RDS console](docs/images/rds-console.png)
 
-## Managing the Cluster with k9s
+## Developer Tools
+
+### k9s
 
 k9s is a terminal UI for Kubernetes — faster to navigate than raw `kubectl` once the cluster is up.
 
