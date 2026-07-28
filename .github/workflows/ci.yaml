@@ -104,7 +104,7 @@ jobs:
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       # No :latest tag — meaningless in a GitOps setup that always pins by
       # commit SHA (values-staging.yaml never reads it, nothing does), and it
