@@ -287,14 +287,24 @@ def _ticket_matches(qr_text: str, ocr_text: str, event: models.Event, image: Ima
     if not qr_text.strip():
         return False
 
+    combined = (qr_text + " " + ocr_text).lower()
+    words = [w for w in event.name.split() if len(w) > 2]
+    text_matches = bool(words) and sum(1 for w in words if w.lower() in combined) >= max(1, len(words) // 2)
+
     reference_tickets = json.loads(event.reference_tickets) if event.reference_tickets else []
     if reference_tickets:
-        # Real reference samples exist for this event — visual similarity is
-        # the ONLY signal that decides. Text is deliberately excluded here:
-        # it's exactly the part an attacker can edit, so once we have real
-        # data to compare against, a text match alone must never be enough
-        # (a genuine ticket from a DIFFERENT event with this event's name
-        # pasted on top would otherwise still pass on text).
+        # Real incident: a genuinely different event's real ticket (different
+        # vendor, different design) hashed within VISUAL_MATCH_THRESHOLD of
+        # this event's reference — an 8x8 average-hash only captures coarse
+        # layout (white background, centered QR, text above/below), and
+        # basically every digital ticket from every vendor shares that same
+        # rough layout. Visual similarity alone can't tell "same template,
+        # minor edit" apart from "different event, same generic template".
+        # Requiring the text match too closes that gap: the wrong event's
+        # ticket won't mention this event's name anywhere, no matter how
+        # similar its layout hashes.
+        if not text_matches:
+            return False
         uploaded_hash = _perceptual_hash(image)
         for ref_data_uri in reference_tickets:
             try:
@@ -307,13 +317,8 @@ def _ticket_matches(qr_text: str, ocr_text: str, event: models.Event, image: Ima
         return False
 
     # No reference tickets at all for this event (producer chose not to
-    # upload any) — fall back to the original text-based baseline.
-    combined = (qr_text + " " + ocr_text).lower()
-    words = [w for w in event.name.split() if len(w) > 2]
-    if not words:
-        return False
-    matches = sum(1 for w in words if w.lower() in combined)
-    return matches >= max(1, len(words) // 2)
+    # upload any) — fall back to the text-based baseline alone.
+    return text_matches
 
 
 def _extract_text_rekognition(content: bytes) -> str:
@@ -383,21 +388,19 @@ async def validate(
         pass
 
     # שלב ב' — OCR: Rekognition (מנוהל) עם fallback ל-pytesseract מקומי.
-    # מדלגים לגמרי כשלאירוע יש כרטיסי דוגמה — במקרה הזה ההחלטה נשענת רק על
-    # דמיון חזותי (ראו _ticket_matches), וה-OCR לא ייכנס לתמונה בכלל, אז אין
-    # טעם לשלם/להמתין לקריאת Rekognition שהתוצאה שלה תיזרק.
+    # רץ תמיד, גם כשיש כרטיסי דוגמה — _ticket_matches דורש גם התאמת טקסט
+    # לשם/תאריך האירוע הספציפי הזה, לא רק דמיון חזותי (ראו שם למה).
     ocr_text = ""
-    if not event.reference_tickets:
-        if USE_REKOGNITION:
-            try:
-                ocr_text = _extract_text_rekognition(content)
-            except Exception as e:
-                print(f"[REKOGNITION ERROR] {e} — falling back to local OCR")
-        if not ocr_text:
-            try:
-                ocr_text = pytesseract.image_to_string(image, lang="heb+eng")
-            except Exception:
-                pass
+    if USE_REKOGNITION:
+        try:
+            ocr_text = _extract_text_rekognition(content)
+        except Exception as e:
+            print(f"[REKOGNITION ERROR] {e} — falling back to local OCR")
+    if not ocr_text:
+        try:
+            ocr_text = pytesseract.image_to_string(image, lang="heb+eng")
+        except Exception:
+            pass
 
     # ארכיון: שמירת תמונת הכרטיס ב-S3 (אם מוגדר bucket)
     _archive_ticket_to_s3(content, event.id)
