@@ -19,7 +19,7 @@ sleep 30
 
 echo "==> Running terraform destroy (VPC + EKS + RDS — ECR, GitHub OIDC role, and DNS zone stay alive, they cost ~\$0.50/month total)"
 echo "    RDS deletion (skip_final_snapshot) takes a few minutes on its own — this step will wait for it."
-terraform destroy -var-file="dev.tfvars" -target=module.vpc -target=module.eks -target=module.rds
+terraform destroy -var-file="dev.tfvars" -target=module.vpc -target=module.eks -target=module.rds -auto-approve
 
 echo "==> Verifying no compute is left running (ECR, GitHub OIDC role, and DNS zone are expected to remain)"
 terraform state list
