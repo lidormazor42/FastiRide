@@ -586,17 +586,40 @@ def get_event_attendees(
 
 
 # ── Rides ─────────────────────────────────────────────────────────
+def _accessible_event_ids(user: models.User, db: Session) -> set[int]:
+    """Events this user may see rides for — ones they validated a ticket for,
+    plus ones they produce. Validating a ticket is the whole access gate of
+    the product, so it has to be enforced here and not only in the UI."""
+    validated = {ue.event_id for ue in user.validated_events}
+    owned = {
+        e.id for e in db.query(models.Event.id)
+        .filter(models.Event.owner_email == user.email).all()
+    }
+    return validated | owned
+
+
 @app.get("/api/rides")
 def get_rides(
     event_id: int = None,
     db: Session = Depends(get_db),
     session: str = Cookie(default=None),
 ):
-    query = db.query(models.Ride)
-    if event_id:
-        query = query.filter(models.Ride.event_id == event_id)
-    rides = query.order_by(models.Ride.created_at.desc()).all()
+    # Rides carry a real-world meeting point and time for a named person —
+    # this must never be readable by an anonymous caller.
     me = _get_user_from_cookie(session, db)
+    if not me:
+        raise HTTPException(status_code=401, detail="יש להתחבר כדי לצפות בנסיעות")
+
+    allowed = _accessible_event_ids(me, db)
+    if event_id is not None:
+        if event_id not in allowed:
+            raise HTTPException(status_code=403, detail="יש לאמת כרטיס לאירוע כדי לצפות בנסיעות")
+        query = db.query(models.Ride).filter(models.Ride.event_id == event_id)
+    else:
+        if not allowed:
+            return []
+        query = db.query(models.Ride).filter(models.Ride.event_id.in_(allowed))
+    rides = query.order_by(models.Ride.created_at.desc()).all()
 
     ride_ids = [r.id for r in rides]
     approved = []
@@ -636,6 +659,11 @@ def get_rides(
     result = []
     for r in rides:
         d = {c.name: getattr(r, c.name) for c in r.__table__.columns}
+        # The UI only ever needed driver_email to answer "is this mine?" —
+        # answer that directly instead of handing every other driver's
+        # address out to everyone who can see the board.
+        d["is_mine"] = bool(r.driver_email) and r.driver_email == me.email
+        d.pop("driver_email", None)
         d["participants"] = participants_by_ride.get(r.id, [])
         d["my_request"]   = my_requests.get(r.id)
         result.append(d)

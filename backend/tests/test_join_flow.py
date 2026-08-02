@@ -1,4 +1,4 @@
-from tests.conftest import make_user, login, make_event, make_ride
+from tests.conftest import make_user, login, make_event, make_ride, grant_event_access
 
 
 def test_join_requires_login(client, db):
@@ -42,6 +42,7 @@ def test_approve_reduces_seats_and_requires_driver(client, db):
     other = make_user(db, email="other@example.com")
     event = make_event(db)
     ride = make_ride(db, event.id, driver_email=driver.email, seats_available=2)
+    grant_event_access(db, driver, event.id)
 
     login(client, passenger)
     request_id = client.post(f"/api/rides/{ride.id}/join", json={"passenger_name": passenger.name}).json()["id"]
@@ -63,6 +64,7 @@ def test_reject_deletes_request_without_touching_seats(client, db):
     passenger = make_user(db, email="passenger@example.com")
     event = make_event(db)
     ride = make_ride(db, event.id, driver_email=driver.email, seats_available=2)
+    grant_event_access(db, driver, event.id)
 
     login(client, passenger)
     request_id = client.post(f"/api/rides/{ride.id}/join", json={"passenger_name": passenger.name}).json()["id"]
@@ -80,6 +82,8 @@ def test_cancel_join_frees_seat_only_if_was_approved(client, db):
     passenger = make_user(db, email="passenger@example.com")
     event = make_event(db)
     ride = make_ride(db, event.id, driver_email=driver.email, seats_available=2)
+    grant_event_access(db, driver, event.id)
+    grant_event_access(db, passenger, event.id)  # reads the board back below
 
     login(client, passenger)
     request_id = client.post(f"/api/rides/{ride.id}/join", json={"passenger_name": passenger.name}).json()["id"]

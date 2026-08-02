@@ -1068,7 +1068,7 @@
       rides.forEach(r => { ridesStore[r.id] = r; });
 
       list.innerHTML = rides.map((ride, i) => {
-        const isOwn  = !!email && ride.driver_email === email;
+        const isOwn  = !!ride.is_mine;
         const isFull = ride.seats_available <= 0;
         const dim    = isFull && !isOwn;
         const delay  = i * 0.07;

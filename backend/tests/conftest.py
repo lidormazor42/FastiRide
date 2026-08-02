@@ -86,6 +86,14 @@ def make_event(db, owner_email="owner@example.com", name="Psytrance Fest", date=
     return event
 
 
+def grant_event_access(db, user, event_id):
+    """What validating a ticket does — the gate GET /api/rides enforces."""
+    ue = models.UserEvent(user_id=user.id, event_id=event_id)
+    db.add(ue)
+    db.commit()
+    return ue
+
+
 def make_ride(db, event_id, driver_email="driver@example.com", seats_available=2):
     ride = models.Ride(
         event_id=event_id,
