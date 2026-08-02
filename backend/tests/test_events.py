@@ -14,22 +14,29 @@ def _israel_today():
     return datetime.now(ZoneInfo("Asia/Jerusalem")).date()
 
 
+def _future_date():
+    # Never hardcode a date here: a literal that was safely in the future when
+    # written eventually becomes the past, and every create-event test starts
+    # failing on the server's own past-date rule instead of what it tests.
+    return _iso(_israel_today() + timedelta(days=30))
+
+
 def test_create_event_requires_login(client):
-    res = client.post("/api/events", json={"name": "Fest", "date": "2026-08-01", "owner_phone": "0501234567"})
+    res = client.post("/api/events", json={"name": "Fest", "date": _future_date(), "owner_phone": "0501234567"})
     assert res.status_code == 401
 
 
 def test_create_event_rejects_bad_phone(client, db):
     user = make_user(db)
     login(client, user)
-    res = client.post("/api/events", json={"name": "Fest", "date": "2026-08-01", "owner_phone": "123"})
+    res = client.post("/api/events", json={"name": "Fest", "date": _future_date(), "owner_phone": "123"})
     assert res.status_code == 400
 
 
 def test_create_event_success(client, db):
     user = make_user(db)
     login(client, user)
-    res = client.post("/api/events", json={"name": "Fest", "date": "2026-08-01", "owner_phone": "050-123-4567"})
+    res = client.post("/api/events", json={"name": "Fest", "date": _future_date(), "owner_phone": "050-123-4567"})
     assert res.status_code == 200
     body = res.json()
     assert body["owner_email"] == user.email
@@ -41,7 +48,7 @@ def test_create_event_grants_creator_immediate_access(client, db):
     just created themselves — creating it should count as access already."""
     user = make_user(db)
     login(client, user)
-    res = client.post("/api/events", json={"name": "Fest", "date": "2026-08-01", "owner_phone": "0501234567"})
+    res = client.post("/api/events", json={"name": "Fest", "date": _future_date(), "owner_phone": "0501234567"})
     assert res.status_code == 200
     event_id = res.json()["id"]
 
@@ -52,7 +59,7 @@ def test_create_event_grants_creator_immediate_access(client, db):
 def test_create_event_duplicate_name_date_conflicts(client, db):
     user = make_user(db)
     login(client, user)
-    payload = {"name": "Fest", "date": "2026-08-01", "owner_phone": "0501234567"}
+    payload = {"name": "Fest", "date": _future_date(), "owner_phone": "0501234567"}
     assert client.post("/api/events", json=payload).status_code == 200
     res = client.post("/api/events", json=payload)
     assert res.status_code == 409

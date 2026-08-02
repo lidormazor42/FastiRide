@@ -1095,6 +1095,40 @@
       setTimeout(() => modal.style.display = 'none', 200);
     }
 
+    /* A logo picked straight from a phone's gallery is easily a 2048x2048,
+       multi-megabyte image, and it gets base64'd into the event row — so it
+       then ships on every event-list load just to draw a 40px thumbnail.
+       Downscale first. Keeps PNG only when the alpha channel is actually
+       used, since JPEG would turn a transparent logo background black. */
+    function downscaleToDataUrl(file, maxDim = 512) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('שגיאה בקריאת קובץ הלוגו.'));
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = () => reject(new Error('קובץ הלוגו אינו תמונה תקינה.'));
+          img.onload = () => {
+            const scale  = Math.min(1, maxDim / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width  = Math.max(1, Math.round(img.width  * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            let usesAlpha = false;
+            const px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            for (let i = 3; i < px.length; i += 4) {
+              if (px[i] < 255) { usesAlpha = true; break; }
+            }
+            resolve(usesAlpha ? canvas.toDataURL('image/png')
+                              : canvas.toDataURL('image/jpeg', 0.85));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
     async function doSubmitOrganizer() {
       closeConfirmCreateModal();
       const btn   = document.getElementById('org-submit-btn');
@@ -1114,11 +1148,7 @@
         body.reference_tickets = _referenceTicketImages;
         const logoFile = document.getElementById('org-logo').files[0];
         if (logoFile) {
-          body.logo_url = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.readAsDataURL(logoFile);
-          });
+          body.logo_url = await downscaleToDataUrl(logoFile);
         }
 
         const res = isEdit
