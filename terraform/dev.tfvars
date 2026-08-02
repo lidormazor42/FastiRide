@@ -12,8 +12,8 @@ node_desired_size  = 2
 node_min_size      = 1
 node_max_size      = 3
 
-# EKS API endpoint locked to Lidor's current IP — kubectl/ArgoCD from anywhere
-# else is refused. CI never needs this (it only talks to ECR + git, never
-# kubectl). If this IP changes (dynamic residential/ISP address), update it
-# here — `curl -s https://checkip.amazonaws.com` gets the current one.
-eks_public_access_cidrs = ["79.177.135.66/32"]
+# Temporarily opened wide for the 5.8 presentation (moving networks —
+# examiner's venue — makes the usual IP-lock a live risk mid-demo; IAM auth
+# is still required to actually talk to the API either way). Lock this back
+# down to a single IP after the cluster's next teardown/raise cycle.
+eks_public_access_cidrs = ["0.0.0.0/0"]
