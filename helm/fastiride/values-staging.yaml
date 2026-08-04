@@ -3,13 +3,13 @@
 # where changes get validated before an explicit version-tag promotes them to prod.
 backend:
   image:
-    tag: da1dccbebb859e78843719ac1d4d89ef8415a467 # seed value — bumped by CI (deploy-staging job) on every push to main from here on
+    tag: e18837afb51c8cdf534571ec8a978bc2cb97d17e # seed value — bumped by CI (deploy-staging job) on every push to main from here on
   replicas: 2 # multi-pod on purpose: chat now rides Redis pub/sub, and staging is where cross-pod delivery is continuously proven
   irsa:
     roleArn: "arn:aws:iam::439594592108:role/fastiride-dev-backend-irsa" # same role, trust policy allows both namespaces
 frontend:
   image:
-    tag: da1dccbebb859e78843719ac1d4d89ef8415a467 # seed value — bumped by CI (deploy-staging job) on every push to main from here on
+    tag: e18837afb51c8cdf534571ec8a978bc2cb97d17e # seed value — bumped by CI (deploy-staging job) on every push to main from here on
   replicas: 1
 ingress:
   host: staging.fastiride.app
