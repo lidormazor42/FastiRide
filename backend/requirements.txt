@@ -10,7 +10,7 @@ pytesseract==0.3.13
 python-multipart==0.0.32
 boto3==1.43.62
 python-jose[cryptography]==3.5.0
-prometheus-fastapi-instrumentator==7.0.0
+prometheus-fastapi-instrumentator==8.1.0
 redis==8.1.0
 slowapi==0.1.10
 pytest==9.1.1
