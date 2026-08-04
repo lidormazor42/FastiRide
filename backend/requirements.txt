@@ -12,5 +12,5 @@ boto3==1.43.57
 python-jose[cryptography]==3.5.0
 prometheus-fastapi-instrumentator==7.0.0
 redis==8.0.1
-slowapi==0.1.9
+slowapi==0.1.10
 pytest==9.1.1
