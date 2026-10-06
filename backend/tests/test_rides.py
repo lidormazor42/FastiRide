@@ -4,6 +4,7 @@ from tests.conftest import make_user, login, make_event, make_ride, grant_event_
 def test_create_ride_with_new_fields(client, db):
     user = make_user(db, email="driver@example.com")
     event = make_event(db)
+    grant_event_access(db, user, event.id)
     login(client, user)
 
     res = client.post("/api/rides", json={
@@ -43,6 +44,7 @@ def test_create_ride_ignores_spoofed_driver_identity(client, db):
     their name (they'd own the ride and get its join-request emails)."""
     user = make_user(db, name="Real Name", email="real@example.com")
     event = make_event(db)
+    grant_event_access(db, user, event.id)
     login(client, user)
     res = client.post("/api/rides", json={
         "event_id": event.id,
@@ -65,6 +67,25 @@ def test_ownerless_ride_is_locked_not_open(client, db):
     login(client, user)
     assert client.patch(f"/api/rides/{ride.id}", json={"city": "חיפה"}).status_code == 403
     assert client.delete(f"/api/rides/{ride.id}").status_code == 403
+
+
+def test_create_ride_requires_ticket_validated_for_that_event(client, db):
+    """Same access gate as reading the board: a validated ticket for event A
+    must not let its holder publish a ride into event B's board."""
+    user = make_user(db, email="driver@example.com")
+    event_a = make_event(db, name="Event A")
+    event_b = make_event(db, name="Event B")
+    grant_event_access(db, user, event_a.id)
+    login(client, user)
+
+    res = client.post("/api/rides", json={
+        "event_id": event_b.id,
+        "driver_name": "נהג",
+        "city": "תל אביב",
+        "pickup_point": "תחנה",
+        "departure_time": "14:00",
+    })
+    assert res.status_code == 403
 
 
 def test_create_ride_requires_existing_event(client, db):

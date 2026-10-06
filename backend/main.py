@@ -684,6 +684,10 @@ def create_ride(
     event = db.query(models.Event).filter(models.Event.id == ride.event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="האירוע לא נמצא")
+    # Same access gate as reading the board (_accessible_event_ids) — without
+    # this, a validated ticket for event A could publish a ride into event B.
+    if ride.event_id not in _accessible_event_ids(user, db):
+        raise HTTPException(status_code=403, detail="יש לאמת כרטיס לאירוע כדי לפרסם נסיעה")
     ride_data = ride.model_dump()
     # Identity comes from the session, never from client input — same rule
     # join_ride already enforces for passengers. A client-supplied
